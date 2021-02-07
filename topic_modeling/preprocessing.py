@@ -3,10 +3,11 @@
 """Preprocessing (primarily) Russian raw text for topic modeling.
 
 Script usage: `python preprocessing.py tsv_output_path input_directory`
-where tsv_output_path is the Mallet file to write to and input_directory 
+where tsv_output_path is the Mallet file to write to and input_directory
 contains UTF-8 text files
 
-TODO: this assumes everything is written in UTF-8, but we might have to deal with Windows-1251
+TODO: this assumes everything is written in UTF-8 and skips undecodeable files, but we might have to deal with Windows-1251 too eventually
+TODO: Switch from sys.argv to argparse and add help
 """
 
 __author__= "Virginia Partridge"
@@ -18,25 +19,25 @@ def parse_raw_text_file(file_path):
 	"""Raw text file to snippets in list format easily used with Mallet.
 	For now, doc_id (doc name) is the label.
 	:param file_path: Path a particular text file
-	:returns: List of lists like [ [doc_id_0, label, text], 
+	:returns: List of lists like [ [doc_id_0, label, text],
 								   [doc_id_1, label, text] ]
+    :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
 	"""
 	counter = 0
 	results = []
 	doc_id = file_path.stem
-	with open(file_path, mode='r', encoding='utf-8') as doc_in:
-		snippet = ''
-		for line in doc_in:
-			if not line.isspace():
-				clean_line = line.replace('\t', ' ').strip()
-				snippet = ' '.join([snippet, clean_line])
+    with open(file_path, mode='r', encoding='utf-8') as doc_in:
+        snippet = ''
+        for line in doc_in:
+            if not line.isspace():
+                clean_line = line.replace('\t', ' ').strip()
+                    snippet = ' '.join([snippet, clean_line])
 
-			elif line.isspace() and snippet != '':
-				results.append([f'{doc_id}_{counter}', doc_id, snippet])
-				counter += 1
-				snippet = ''
-
-	return results
+            elif line.isspace() and snippet != '':
+                results.append([f'{doc_id}_{counter}', doc_id, snippet])
+                counter += 1
+                snippet = ''
+ 	return results
 
 
 def main(tsv_output, input_dir):
@@ -45,11 +46,14 @@ def main(tsv_output, input_dir):
 	:param input_dir: Str, path to directory containing input txt files
 	"""
 	input_dir_path = pathlib.Path(input_dir)
-	for document in input_dir_path.glob('*.txt'):
-		print("Parsing doc:", document)
-		parsed_doc = parse_raw_text_file(document)
-		with open(tsv_output, mode='a', encoding='utf-8') as tsv_out:
-			tsv_out.write('\n'.join('\t'.join(l) for l in parsed_doc))
+    with open(tsv_output, mode='a', encoding='utf-8') as tsv_out:
+	    for document in input_dir_path.glob('*.txt'):
+		    print("Parsing doc:", document)
+            try:
+		        parsed_doc = parse_raw_text_file(document)
+			    tsv_out.write('\n'.join('\t'.join(l) for l in parsed_doc))
+            except UnicodeDecodeError as e:
+                print(document, "doesn't appear to be in UTF-8, skipping. Error:", e)
 
 
 if __name__ == "__main__":
