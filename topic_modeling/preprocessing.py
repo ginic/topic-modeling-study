@@ -1,9 +1,9 @@
 # coding=utf-8
 
-"""Preprocessing (primarily) Russian raw text for topic modeling.
-Splits documents on blank lines.
+"""Preprocessing non-English (primarily Russian, but theoretically this shouldn't matter)
+raw text for topic modeling. Options for splitting documents on blank lines or to a limited word count.
 
-Script usage: `python preprocessing.py tsv_output_path input_directory`
+Basic script usage: `python preprocessing.py tsv_output_path input_directory`
 where tsv_output_path is the Mallet file to write to and input_directory
 contains UTF-8 text files
 
