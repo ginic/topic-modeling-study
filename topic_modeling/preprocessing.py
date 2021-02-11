@@ -17,9 +17,23 @@ __author__= "Virginia Partridge"
 import pathlib
 import sys
 
-def parse_raw_text_file(file_path):
-    """Raw text file to snippets in list format easily used with Mallet. Strips out any tabs from text.
+
+def split_doc_on_word_count(word_count=150):
+    """Raw text file to snippets of size of word_count word types
+    deliniated by white space.
     For now, doc_id (doc name) is the label.
+
+    :param file_path: Path a particular text file
+    :returns: List of lists like [ [doc_id_0, label, text],
+                                    [doc_id_1, label, text] ]
+    :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
+    """
+    pass
+
+def split_doc_on_blank_lines(file_path):
+    """Raw text file to snippets in list format easily used with Mallet. Strips out any tabs from text. Documents are divided on blank lines.
+    For now, doc_id (doc name) is the label.
+
     :param file_path: Path a particular text file
     :returns: List of lists like [ [doc_id_0, label, text],
                                     [doc_id_1, label, text] ]
@@ -57,7 +71,7 @@ def main(tsv_output, input_dir):
         for document in input_dir_path.glob('*.txt'):
             print("Parsing doc:", document)
             try:
-                parsed_doc = parse_raw_text_file(document)
+                parsed_doc = split_doc_on_blank_lines(document)
                 tsv_out.writelines(['\t'.join(l) + '\n' for l in parsed_doc])
             except UnicodeDecodeError as e:
                 print(document, "doesn't appear to be in UTF-8, skipping. Error:", e)
