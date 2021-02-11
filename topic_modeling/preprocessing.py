@@ -7,19 +7,21 @@ Script usage: `python preprocessing.py tsv_output_path input_directory`
 where tsv_output_path is the Mallet file to write to and input_directory
 contains UTF-8 text files
 
-TODO: Add options for more fine control over splitting documents (split every specified number of tokens or such)
 TODO: This assumes everything is written in UTF-8 and skips undecodeable files, but we might have to deal with Windows-1251 too eventually
-TODO: Switch from sys.argv to argparse and add help
 """
 
 __author__= "Virginia Partridge"
 
-import itertools
+import argparse
 import pathlib
 import sys
 
+DEFAULT_WORD_COUNT = 150
+WORD_COUNT_SPLITTER = 'word_count'
+LINE_SPLITTER = 'line'
 
-def split_doc_on_word_count(file_path, word_count=150):
+
+def split_doc_on_word_count(file_path, word_count=DEFAULT_WORD_COUNT):
     """Raw text file broken down to snippets of size of word_count word types
     deliniated by white space.
     For now, doc_id (doc name) is the label.
@@ -75,7 +77,7 @@ def split_doc_on_blank_lines(file_path):
     return results
 
 
-def main(tsv_output, input_dir):
+def main(tsv_output, input_dir, split_choice=WORD_COUNT_SPLITTER, word_count=DEFAULT_WORD_COUNT):
     """Given a directory of input text files, breaks documents into 'paragraphs' and outputs a Mallet format TSV file.
     :param tsv_output: Str, path to desired tsv output file
     :param input_dir: Str, path to directory containing input txt files
@@ -85,11 +87,37 @@ def main(tsv_output, input_dir):
         for document in input_dir_path.glob('*.txt'):
             print("Parsing doc:", document)
             try:
-                parsed_doc = split_doc_on_blank_lines(document)
+                if split_choice == LINE_SPLITTER:
+                    parsed_doc = split_doc_on_blank_lines(document)
+                elif split_choice == WORD_COUNT_SPLITTER:
+                    parsed_doc = split_doc_on_word_count(document, word_count)
+                else:
+                    raise ValueError(f"Unsupported document splitting option:{split_choice}")
+
                 tsv_out.writelines(['\t'.join(l) + '\n' for l in parsed_doc])
             except UnicodeDecodeError as e:
                 print(document, "doesn't appear to be in UTF-8, skipping. Error:", e)
 
 
+parser = argparse.ArgumentParser(description="Preprocessing of text for topic modeling with Mallet")
+parser.add_argument(
+    'tsv_output',
+    help="Path to desired TSV output files. Documents will be appended to the document if it already exists.",)
+parser.add_argument(
+    'corpus_directory',
+    help="Path to the folder containing corpus where each document is expected to be a .txt file")
+parser.add_argument(
+    '--splitter',
+    help='Choice of heuristic for splitting documents. Default "word_count" splits into a specified number of whitespace deliniated word types and "line" splits at blank lines.',
+    default=WORD_COUNT_SPLITTER,
+    choices=[LINE_SPLITTER, WORD_COUNT_SPLITTER])
+parser.add_argument(
+    '--word_count', '-w',
+    type=int,
+    default=DEFAULT_WORD_COUNT,
+    help="Document size in word type count when splitting using 'word_count' option")
+
+
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    args = parser.parse_args()
+    main(args.tsv_output, args.corpus_directory, args.splitter, args.word_count)
