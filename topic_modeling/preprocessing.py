@@ -14,21 +14,35 @@ TODO: Switch from sys.argv to argparse and add help
 
 __author__= "Virginia Partridge"
 
+import itertools
 import pathlib
 import sys
 
 
-def split_doc_on_word_count(word_count=150):
-    """Raw text file to snippets of size of word_count word types
+def split_doc_on_word_count(file_path, word_count=150):
+    """Raw text file broken down to snippets of size of word_count word types
     deliniated by white space.
     For now, doc_id (doc name) is the label.
 
     :param file_path: Path a particular text file
+    :param word_count: int marking the number of words to subdivide documents in to
     :returns: List of lists like [ [doc_id_0, label, text],
                                     [doc_id_1, label, text] ]
     :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
     """
-    pass
+    results = []
+    counter = 0
+    doc_id = file_path.stem
+
+    # Individual documents shouldn't be big enough for this to cause problems
+    split_text = file_path.read_text(encoding='utf-8').split()
+    for i in range(0, len(split_text), word_count):
+        snippet = split_text[i:i+word_count]
+        results.append([f'{doc_id}_{counter}', doc_id, ' '.join(snippet)])
+        counter += 1
+
+    return results
+
 
 def split_doc_on_blank_lines(file_path):
     """Raw text file to snippets in list format easily used with Mallet. Strips out any tabs from text. Documents are divided on blank lines.
