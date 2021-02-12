@@ -1,13 +1,15 @@
 # coding=utf-8
 
-"""Preprocessing non-English (primarily Russian, but theoretically this shouldn't matter)
-raw text for topic modeling. Options for splitting documents on blank lines or to a limited word count.
+"""Preprocessing non-English (primarily Russian, but theoretically this
+shouldn't matter) raw text for topic modeling.
+Options for splitting documents on blank lines or to a limited word count.
 
 Basic script usage: `python preprocessing.py tsv_output_path input_directory`
 where tsv_output_path is the Mallet file to write to and input_directory
 contains UTF-8 text files
 
-TODO: This assumes everything is written in UTF-8 and skips undecodeable files, but we might have to deal with Windows-1251 too eventually
+TODO: This assumes everything is written in UTF-8 and skips undecodeable files,
+      but we might have to deal with Windows-1251 too eventually
 """
 
 __author__= "Virginia Partridge"
@@ -27,7 +29,7 @@ def split_doc_on_word_count(file_path, word_count=DEFAULT_WORD_COUNT):
     For now, doc_id (doc name) is the label.
 
     :param file_path: Path a particular text file
-    :param word_count: int marking the number of words to subdivide documents in to
+    :param word_count: int marking the number of words to subdivide documents
     :returns: List of lists like [ [doc_id_0, label, text],
                                     [doc_id_1, label, text] ]
     :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
@@ -47,7 +49,8 @@ def split_doc_on_word_count(file_path, word_count=DEFAULT_WORD_COUNT):
 
 
 def split_doc_on_blank_lines(file_path):
-    """Raw text file to snippets in list format easily used with Mallet. Strips out any tabs from text. Documents are divided on blank lines.
+    """Raw text file to snippets in list format easily used with Mallet.
+    Strips out any tabs from text. Documents are divided on blank lines.
     For now, doc_id (doc name) is the label.
 
     :param file_path: Path a particular text file
@@ -77,8 +80,10 @@ def split_doc_on_blank_lines(file_path):
     return results
 
 
-def main(tsv_output, input_dir, split_choice=WORD_COUNT_SPLITTER, word_count=DEFAULT_WORD_COUNT):
-    """Given a directory of input text files, breaks documents into 'paragraphs' and outputs a Mallet format TSV file.
+def main(tsv_output, input_dir, split_choice=WORD_COUNT_SPLITTER,
+         word_count=DEFAULT_WORD_COUNT):
+    """Given a directory of input text files, breaks documents into '
+    paragraphs' and outputs a Mallet format TSV file.
     :param tsv_output: Str, path to desired tsv output file
     :param input_dir: Str, path to directory containing input txt files
     """
