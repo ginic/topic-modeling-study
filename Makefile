@@ -9,6 +9,9 @@ TXT_CORPUS := ~/workspace/RussianNovels/corpus
 # Dir name for corpus & Mallet output
 CORPUS_TARGET := russian_novels
 
+# Path to Authorless TMs repo
+AUTHORLESS_TMS := ~/workspace/authorless-tms
+
 # Topic modeling experiments with default settings
 MALLET_IMPORT_FLAGS := --keep-sequence
 NUM_TOPICS := 100
@@ -24,12 +27,19 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 	python topic_modeling/preprocessing.py $@ $<
 	@echo "Number of original files:"
 	@echo $(words $(wildcard $</*.txt))
-	@echo "File ids in output:"
+	@echo "Author ids in output:"
 	cut -f2 $@ | sort | uniq | wc -l
+	@echo "Novel ids in output:"
+	cut -f1,2 -d_ $@ | sort | uniq | wc -l
+
 
 # Import TSV data to Mallet format
 %.mallet: %.tsv
 	mallet import-file $(MALLET_IMPORT_FLAGS) --input $< --output $@
+
+# Just authorless-tms/get_vocab.sh
+%_vocab.txt: %.mallet
+	mallet info --input $< --print-feature-counts | cut -f 1 | sort -k 1 > $@
 
 # Build a topic model and save topic state
 # These are probably fragile, don't use with parallel make

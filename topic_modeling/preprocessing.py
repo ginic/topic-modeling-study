@@ -10,6 +10,7 @@ contains UTF-8 text files
 
 TODO: This assumes everything is written in UTF-8 and skips undecodeable files,
       but we might have to deal with Windows-1251 too eventually
+TODO: Properly choose metadata for column 2 given a metadata input file
 """
 
 __author__= "Virginia Partridge"
@@ -22,6 +23,12 @@ DEFAULT_WORD_COUNT = 150
 WORD_COUNT_SPLITTER = 'word_count'
 LINE_SPLITTER = 'line'
 
+
+def get_author_label(doc_id):
+    """ Return the author from the RussianNovels corpus file name.
+    Placeholder until better metadata handling can be put in place.
+    """
+    return doc_id.split('_')[0]
 
 def split_doc_on_word_count(file_path, word_count=DEFAULT_WORD_COUNT):
     """Raw text file broken down to snippets of size of word_count word types
@@ -37,12 +44,13 @@ def split_doc_on_word_count(file_path, word_count=DEFAULT_WORD_COUNT):
     results = []
     counter = 0
     doc_id = file_path.stem
+    author_label = get_author_label(doc_id)
 
     # Individual documents shouldn't be big enough for this to cause problems
     split_text = file_path.read_text(encoding='utf-8').split()
     for i in range(0, len(split_text), word_count):
         snippet = split_text[i:i+word_count]
-        results.append([f'{doc_id}_{counter}', doc_id, ' '.join(snippet)])
+        results.append([f'{doc_id}_{counter}', author_label, ' '.join(snippet)])
         counter += 1
 
     return results
@@ -61,6 +69,7 @@ def split_doc_on_blank_lines(file_path):
     counter = 0
     results = []
     doc_id = file_path.stem
+    author_label= get_author_label(doc_id)
     with open(file_path, mode='r', encoding='utf-8') as doc_in:
         snippet = ''
         for line in doc_in:
@@ -69,13 +78,13 @@ def split_doc_on_blank_lines(file_path):
                 snippet = ' '.join([snippet, clean_line]).strip()
 
             elif line.isspace() and snippet != '':
-                results.append([f'{doc_id}_{counter}', doc_id, snippet])
+                results.append([f'{doc_id}_{counter}', author_label, snippet])
                 counter += 1
                 snippet = ''
 
     # If documents don't end in blank lines, add the last snippet
     if not snippet.isspace():
-        results.append([f'{doc_id}_{counter}', doc_id, snippet])
+        results.append([f'{doc_id}_{counter}', author_label, snippet])
 
     return results
 
