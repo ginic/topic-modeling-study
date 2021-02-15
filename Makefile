@@ -12,11 +12,20 @@ CORPUS_TARGET := russian_novels
 # Path to Authorless TMs repo
 AUTHORLESS_TMS := ~/workspace/authorless-tms
 
+# Mallet corpus feature settings for info & pruning
+# Mallet term frequency and doc freqency pruning settings
+MIN_TERM_FREQ := 5
+# For Mallet, a given term's idf = ln(|corpus|/doc_freq), so 1.39 is 25% of corpus
+MIN_IDF := 1.39
+FEATURE_SUFFIX := counts.tsv
+
 # Topic modeling experiments with default settings
 MALLET_IMPORT_FLAGS := --keep-sequence
 NUM_TOPICS := 100
-NUM_ITERS := 100
-MALLET_TOPIC_FLAGS := --num-topics $(NUM_TOPICS) --num-iterations $(NUM_ITERS)
+NUM_ITERS := 1000
+OPTIMIZE_INTERVAL := 20
+OPTIMIZE_BURN_IN := 50
+MALLET_TOPIC_FLAGS := --num-topics $(NUM_TOPICS) --num-iterations $(NUM_ITERS) --optimize-interval $(OPTIMIZE_INTERVAL) --optimize-burn-in $(OPTIMIZE_BURN_IN)
 
 # Naming conventions for topic models
 TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
@@ -37,13 +46,22 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 %.mallet: %.tsv
 	mallet import-file $(MALLET_IMPORT_FLAGS) --input $< --output $@
 
-# Just authorless-tms/get_vocab.sh
+# Prunes vocabulary of corpus using given min-idf and min term frequency settings
+# Also outputs all features with tf and df for each vocab term, sorted by decreasing df
+%_pruned.mallet: %.mallet
+	mallet prune --input $< --output $@ --min-idf $(MIN_IDF) --prune-count $(MIN_TERM_FREQ)
+
+# Print out corpus term frequency and document frequency stats
+%_$(FEATURE_SUFFIX): %.mallet
+	mallet info --input $< --print-feature-counts | sort --key=3 --reverse --numeric > $@
+
+# Just authorless-tms/get_vocab.sh: Get vocabulary sorted alphabetically (no counts)
 %_vocab.txt: %.mallet
 	mallet info --input $< --print-feature-counts | cut -f 1 | sort -k 1 > $@
 
-# Build a topic model and save topic state
+# Build a topic model and save topic state from the pruned corpus
 # These are probably fragile, don't use with parallel make
-%_$(TOPIC_EXPERIMENT_ID): %.mallet
+%_$(TOPIC_EXPERIMENT_ID): %_pruned.mallet
 	mkdir -p $@
 	$(eval file_base := $(addsuffix /$(notdir $@),$@))
 	$(eval state := $(addsuffix .gz,$(file_base)))
@@ -61,8 +79,8 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 # Run an experiment with default corpus and topic model settings
 default_experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
 
-# Build a Mallet corpus with default corpus settings
-default_corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET).mallet
+# Build both full and pruned Mallet corpora with default corpus settings
+default_corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET).mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(FEATURE_SUFFIX)
 
 # Cleans up the default corpus target
 clean:
@@ -71,4 +89,4 @@ clean:
 .PHONY: clean default_experiment default_corpus
 
 # Don't ever clean up .tsv or .mallet files
-.PRECIOUS: %.tsv %.mallet
+.PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX)

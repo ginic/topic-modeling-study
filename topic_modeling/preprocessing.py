@@ -11,6 +11,7 @@ contains UTF-8 text files
 TODO: This assumes everything is written in UTF-8 and skips undecodeable files,
       but we might have to deal with Windows-1251 too eventually
 TODO: Properly choose metadata for column 2 given a metadata input file
+TODO: Add line_count option for producing documents of particular length
 """
 
 __author__= "Virginia Partridge"
@@ -19,9 +20,11 @@ import argparse
 import pathlib
 import sys
 
-DEFAULT_WORD_COUNT = 150
+DEFAULT_WORD_COUNT = 400
+DEFAULT_LINE_COUNT = 10
 WORD_COUNT_SPLITTER = 'word_count'
-LINE_SPLITTER = 'line'
+LINE_SPLITTER = 'line_break'
+LINE_COUNT_SPLITTER = 'line_count'
 
 
 def get_author_label(doc_id):
@@ -29,6 +32,20 @@ def get_author_label(doc_id):
     Placeholder until better metadata handling can be put in place.
     """
     return doc_id.split('_')[0]
+
+def split_on_line_count(file_path, line_count=DEFAULT_LINE_COUNT,
+                        min_word_count=DEFAULT_WORD_COUNT):
+    """Raw text file broken down into snippets that are at least 'line_count'
+    lines long and at least 'min_word_count' word types in length.
+
+    :param file_path: Path a particular text file
+    :param line_count: int, min number of lines allowed in snippet
+    :param min_word_count: int, min number of words allowed in snippet
+    :returns: List of lists like [ [doc_id_0, label, text],
+                                    [doc_id_1, label, text] ]
+    :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
+    """
+    pass
 
 def split_doc_on_word_count(file_path, word_count=DEFAULT_WORD_COUNT):
     """Raw text file broken down to snippets of size of word_count word types
@@ -122,14 +139,20 @@ parser.add_argument(
     help="Path to the folder containing corpus where each document is expected to be a .txt file")
 parser.add_argument(
     '--splitter',
-    help='Choice of heuristic for splitting documents. Default "word_count" splits into a specified number of whitespace deliniated word types and "line" splits at blank lines.',
+    help='Choice of heuristic for splitting documents. Default "word_count" splits into a specified number of whitespace deliniated word types. The "line_count" option splits documents into at least the specified number of lines, but will add lines until the word count minimum is reached. The "line_break" option splits at blank lines.',
     default=WORD_COUNT_SPLITTER,
     choices=[LINE_SPLITTER, WORD_COUNT_SPLITTER])
 parser.add_argument(
     '--word_count', '-w',
     type=int,
     default=DEFAULT_WORD_COUNT,
-    help="Document size in word type count when splitting using 'word_count' option")
+    help="Document size in word type count when splitting using 'word_count' option. Minimum number of words allowed in a document when using the 'line_count' option.")
+parser.add_argument(
+    '--line_count', '-l',
+    type=int,
+    default=DEFAULT_LINE_COUNT,
+    help="Minimum number of lines "
+)
 
 
 if __name__ == "__main__":
