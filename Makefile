@@ -77,16 +77,16 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 	@test -f $@ || $(MAKE) $(AM_MAKEFLAGS) $<
 
 # Run an experiment with default corpus and topic model settings
-default_experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
+experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
 
 # Build both full and pruned Mallet corpora with default corpus settings
-default_corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET).mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(FEATURE_SUFFIX)
+corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET).mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(FEATURE_SUFFIX)
 
 # Cleans up the default corpus target
 clean:
 	rm -r $(CORPUS_TARGET)
 
-.PHONY: clean default_experiment default_corpus
+.PHONY: clean experiment corpus
 
 # Don't ever clean up .tsv or .mallet files
 .PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX)

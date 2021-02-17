@@ -1,4 +1,5 @@
 # !/bin/bash
+
 # Quick script for outputting metadata for JoannaRus data to tsv format
 # [doc_id]\t[author_label]\t[title]
 # Doc ids in this case are just 'author_title'
