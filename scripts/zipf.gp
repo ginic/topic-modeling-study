@@ -1,6 +1,7 @@
 #!/user/bin/env gnuplot
 
-# Quick gnuplot for Zipf curves of document frequency. Probably will switch to better python option
+# Quick gnuplot for Zipf curves of document frequency.
+# Probably will switch to better python option
 # once I figure out what all we need, but for now this is fine.
 # Run as `gnuplot ../scripts/zipf.p`
 #
