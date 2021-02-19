@@ -72,7 +72,8 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 	$(eval output_model := $(addsuffix .model,$(file_base)))
 	$(eval doc_topics := $(addsuffix _doc_topics.txt,$(file_base)))
 	$(eval topic_keys := $(addsuffix _topic_keys.txt,$(file_base)))
-	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys)
+	$(eval top_docs := $(addsuffix _top_docs.txt, $(file_base)))
+	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs)
 
 # Force all topic modeling files to depend on the output state file
 %.gz %.model %_doc_topics.txt %_topic_keys.txt : %
@@ -84,7 +85,8 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
 
 # Build both full and pruned Mallet corpora with default corpus settings
-corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET).mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(FEATURE_SUFFIX)
+# Sorry about this mess -_-
+corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET).mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET)_vocab.txt $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_vocab.txt  $(CORPUS_TARGET)/$(CORPUS_TARGET)_stopped.txt
 
 # Cleans up the default corpus target
 clean:
