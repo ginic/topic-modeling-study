@@ -59,6 +59,10 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 %_vocab.txt: %.mallet
 	mallet info --input $< --print-feature-counts | cut -f 1 | sort -k 1 > $@
 
+# Build list of stop words by comparing the pruned and original vocabs
+%_stopped.txt: %_vocab.txt %_pruned_vocab.txt
+	comm -23 $^ > $@
+
 # Build a topic model and save topic state from the pruned corpus
 # These are probably fragile, don't use with parallel make
 %_$(TOPIC_EXPERIMENT_ID): %_pruned.mallet
@@ -86,7 +90,12 @@ corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPU
 clean:
 	rm -r $(CORPUS_TARGET)
 
-.PHONY: clean experiment corpus
+# Cleans up experiment folders only
+clean_experiments:
+	rm -r $(CORPUS_TARGET)/$(CORPUS_TARGET)_*topics_*iters
+
+
+.PHONY: clean experiment corpus clean_experiments
 
 # Don't ever clean up .tsv or .mallet files
 .PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX)
