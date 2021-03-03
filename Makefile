@@ -5,9 +5,11 @@ SHELL := bash
 
 # Source of raw text files
 TXT_CORPUS := ~/workspace/RussianNovels/corpus
+#TXT_CORPUS := libru_russian/original
 
 # Dir name for corpus & Mallet output
 CORPUS_TARGET := russian_novels
+#CORPUS_TARGET := libru_russian
 
 # Path to Authorless TMs repo
 # TODO: Target to output correlations files
