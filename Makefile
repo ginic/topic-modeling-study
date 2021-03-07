@@ -18,7 +18,9 @@ AUTHORLESS_TMS := ~/workspace/authorless-tms
 # Mallet corpus feature settings for info & pruning
 # Mallet term frequency and doc freqency pruning settings
 MIN_TERM_FREQ := 5
-# For Mallet, a given term's idf = ln(|corpus|/doc_freq), so 1.39 is 25% of corpus
+# For Mallet, a given term's idf = ln(|corpus|/doc_freq) & Mallet takes care of
+# the negative, so 1.39 removes words in more than 25% of documents
+# If any questions on maxIDF/maxIDF, check https://github.com/ginic/Mallet/blob/master/src/cc/mallet/classify/tui/Vectors2Vectors.java, lines 142-148
 MIN_IDF := 1.39
 FEATURE_SUFFIX := counts.tsv
 
