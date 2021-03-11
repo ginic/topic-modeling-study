@@ -1,4 +1,7 @@
 # coding=utf-8
+'''Tests for topic_modling.stemming
+'''
+import copy
 
 import topic_modeling.stemming
 
@@ -21,9 +24,16 @@ EXPECTED_LEMMAS = ([('однажды', 'однажды'), ('весною', 'ве
 ('шляпу', 'шляпа'), ('пирожком', 'пирожок'), ('нес', 'нести'), ('в', 'в'),
 ('руке', 'рука')])
 
+
 def test_stanza():
     lemmatizer = topic_modeling.stemming.StanzaLemmatizer()
     lemma_pairs = lemmatizer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
     assert len(lemma_pairs) == len(EXPECTED_LEMMAS)
-    # TODO this will definitly fail. Maybe pass if at least half of them are right?
-    # assert lemma_pairs == EXPECTED_LEMMAS
+
+    # Check correct lemmas
+    expected_copy = copy.deepcopy(EXPECTED_LEMMAS)
+    for p in lemma_pairs:
+        if p in expected_copy:
+            expected_copy.remove(p)
+    # pass if at least half of lemmas are right
+    assert len(expected_copy) <= len(EXPECTED_LEMMAS)/2

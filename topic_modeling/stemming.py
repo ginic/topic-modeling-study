@@ -6,6 +6,7 @@
 # TODO Pymystem (POS tag sensitive)
 # TODO Pymorphy2
 '''
+import nltk.stem.snowball as nltkstem
 import stanza
 
 import topic_modeling.tokenization as tokenization
@@ -28,7 +29,7 @@ class StanzaLemmatizer:
 
         :param text: str, Russian text to process
         '''
-        result = []
+        result = list()
         doc = self.pipeline(text)
         for sent in doc.sentences:
             for word in sent.words:
@@ -42,11 +43,25 @@ class StanzaLemmatizer:
 class SnowballStemmer:
     '''Wrapper around NLTK's implementation of the Snowball Stemmer,
     which uses an improved Porter stemming algorithm.
+    http://snowball.tartarus.org/algorithms/russian/stemmer.html
     '''
-    def __init__(self):
-        '''TODO
+    def __init__(self, tokenizer):
+        '''Instantiate NLTK Snowball stemmer
+
+        :param tokenizer: object with a tokenize(str)
         '''
-        pass
+        self.tokenizer = tokenizer
+        self.stemmer = nltkstem.SnowballStemmer('russian')
+
+    def lemmatize(self, text):
+        '''Tokenizes and stems each word in the given text.
+        Returns list of (word, lemma) pairs.
+
+        :param text: str, Russian text to process
+        '''
+        result = list()
+        # TODO
+        return result
 
 
 class PymystemLemmatizer:

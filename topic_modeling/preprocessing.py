@@ -11,6 +11,7 @@ contains UTF-8 text files
 TODO: This assumes everything is written in UTF-8 and skips undecodeable files,
       but we might have to deal with Windows-1251 too eventually
 TODO: Properly choose metadata for column 2 given a metadata input file
+TODO: Replace splitting on whitespace with RegexTokenizer
 """
 
 import argparse
