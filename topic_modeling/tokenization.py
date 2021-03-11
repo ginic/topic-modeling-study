@@ -10,15 +10,15 @@ import regex
 # string.translate is faster and I'd like to have a clear list
 RU_PUNCTUATION='!"#$%&\'()*+,./:;<=>?@[\\]^_`{|}~₽«»–'
 
-# Mallet's default for topic modeling.
-# Note: Doesn't allow for single letter words
+# Mallet's default for topic modeling and import
+# Note: Doesn't allow for 1 or 2 letter words
 MALLET_DEFAULT_TOKENIZATION=r"\p{L}[\p{L}\p{P}]+\p{L}"
 
 # Should allow punctuation between letters, otherwise punctuation is ignored
-WORD_TYPE_TOKENIZATION=r"[\p{L}\d]+\p{P}[\p{L}\d]+|[\p{L}\d]+"
+WORD_TYPE_TOKENIZATION=r"[\p{L}\d]+[\p{P}\p{L}\d]+[\p{L}\d]|[\p{L}\d]+"
 
 # Punctuation not in the middle of a word is kept in its own token
-KEEP_PUNCT_TOKENIZATION=r"[\p{L}\d]+\p{P}[\p{L}\d]+|[\p{L}\d]+|\p{P}"
+KEEP_PUNCT_TOKENIZATION=r"[\p{L}\d]+[\p{P}\p{L}\d]+[\p{L}\d]|[\p{L}\d]+|\p{P}"
 
 def clean_punctuation(text):
     '''Returns a string that matches the input text with punctuation removed
