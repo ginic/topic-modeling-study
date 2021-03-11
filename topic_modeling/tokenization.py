@@ -1,8 +1,9 @@
 # coding=utf-8
-'''Rule based tokenization and punctuation cleaning srategies.
+'''Rule based tokenization and punctuation cleaning strategies.
 '''
 # string.punctuation without hypens for compound words
-RU_PUNCTUATION='!"#$%&\'()*+,./:;<=>?@[\\]^_`{|}~'
+# «» are added for quotations and – (em dash, not a hypen) added for direct speech
+RU_PUNCTUATION='!"#$%&\'()*+,./:;<=>?@[\\]^_`{|}~«»–'
 
 def clean_punctuation(text):
     '''Returns a string that matches the input text with punctuation removed
@@ -14,4 +15,7 @@ def clean_punctuation(text):
 
 class Tokenizer:
     ''' A tokenization strategy that closely matches Mallet.
+    :TODO
     '''
+    def __init__(self):
+        pass
