@@ -1,14 +1,28 @@
 # coding=utf-8
-'''Shared functionalities for stemming and lemmatization
+'''Shared functionalities for stemming and lemmatization.
+The main/script will lemmatize or stem a given input TSV in Mallet format.
 
-# TODO Pymorphy2
+# TODO output token,lemma,count to tsv
 '''
+import argparse
+import csv
+from collections import namedtuple
+import time
+
 import nltk.stem.snowball as nltkstem
 import pymorphy2
 import pymystem3
 import stanza
 
 import topic_modeling.tokenization as tokenization
+
+# choices for stemmers
+PYMORPHY = 'pymorphy2'
+PYMYSTEM = 'pymystem3'
+SNOWBALL = 'snowball'
+STANZA = 'stanza'
+TRUNCATE = 'truncate'
+STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE]
 
 # Desired stanza Russian modeling settings
 STANZA_SETTINGS = 'tokenize,lemma'
@@ -18,24 +32,32 @@ PYMYSTEM_ANALYSIS = 'analysis'
 PYMYSTEM_LEX = 'lex'
 PYMYSTEM_TEXT = 'text'
 
+# Container for tokens and their corresponding stem or lemma
+NormalizedToken = namedtuple('NormalizedToken', 'token normalized')
+
 class StemmingError(Exception):
     '''Raised when underlying stemmers do not behave as expected'''
     pass
 
+
 class StanzaLemmatizer:
     '''Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
     '''
-    def __init__(self):
+    def __init__(self, keep_punct=False):
+        '''Instantiates Stanza lemmatizer and ensures 'ru' models are downloaded
+
+        :param keep_punct: True to keep tokens/lemmas that are just punctuation
+        '''
         stanza.download('ru', processors=STANZA_SETTINGS, package=STANZA_PACKAGE)
         self.pipeline = stanza.Pipeline('ru',processors=STANZA_SETTINGS,
                                         package=STANZA_PACKAGE)
+        self.keep_punct = keep_punct
 
     def lemmatize(self, text, keep_punct=False):
         '''Returns list of (word, lemma) pairs for each word in the given text.
         Stanza's sentence breaking and tokenization is used.
 
         :param text: str, Russian text to process
-        :param keep_punct: True to keep tokens/lemmas that are just punctuation
         '''
         result = list()
         doc = self.pipeline(text)
@@ -43,8 +65,8 @@ class StanzaLemmatizer:
             for word in sent.words:
                 # We don't want any tokens that are only puctuation
                 clean_word = tokenization.clean_punctuation(word.text)
-                if clean_word != '' or keep_punct:
-                    result.append((word.text, word.lemma))
+                if clean_word != '' or self.keep_punct:
+                    result.append(NormalizedToken(word.text, word.lemma))
         return result
 
 
@@ -76,7 +98,7 @@ class SnowballStemmer:
         for t in tokens:
             s = self.stemmer.stem(t)
             if not s.isspace() and s!='':
-                result.append((t,s))
+                result.append(NormalizedToken(t,s))
         return result
 
 
@@ -89,19 +111,22 @@ class Pymystem3Lemmatizer:
     >>>[{'analysis': [{'lex': 'этот', 'wt': 0.05565618415, 'gr': 'APRO=(вин,ед,сред|им,ед,сред)'}], 'text': 'это'},
        {'text': ' '}, {'analysis': [{'lex': 'предложение', 'wt': 1, 'gr': 'S,сред,неод=(вин,ед|им,ед)'}], 'text': 'предложение'}]
     '''
-    def __init__(self):
-        '''Instantiate Mystem
+    def __init__(self, keep_unanalyzed=False):
+        '''Instantiate Mystem wrapper
+
+        :param keep_unanalyzed: True to also return non-whitespace
+            tokens that have no morphological analysis, such as numbers or
+            punctuation
         '''
         self.mystem = pymystem3.Mystem()
+        self.keep_unanalyzed = keep_unanalyzed
 
-    def lemmatize(self, text, keep_unanalyzed_tokens=False):
+    def lemmatize(self, text):
         '''Returns a list (token, lemma) pairs determined for the text
         by Mystem.
 
         :param text: str, text to tokenize and lemmatize.
-        :param keep_unanalyzed_tokens: True to also return non-whitespace
-            tokens that have no morphological analysis, such as numbers or
-            punctuation
+
         '''
         result = list()
         analysis = self.mystem.analyze(text)
@@ -111,9 +136,9 @@ class Pymystem3Lemmatizer:
                 lexes = a[PYMYSTEM_ANALYSIS]
                 if len(lexes) > 1:
                     raise StemmingError(f"Mystem returned multiple analyses, only 1 expected: {a}")
-                result.append((token, lexes[0][PYMYSTEM_LEX]))
-            elif keep_unanalyzed_tokens and not t.isspace() and t!='':
-                result.append(token)
+                result.append(NormalizedToken(token, lexes[0][PYMYSTEM_LEX]))
+            elif self.keep_unanalyzed and not t.isspace() and t!='':
+                result.append(NormalizedToken(token, token))
         return result
 
 
@@ -143,7 +168,7 @@ class Pymorphy2Lemmatizer:
             parses = self.analyzer.parse(t)
             # pymorphy isn't context aware, just take most likely form
             lemma = parses[0].normal_form
-            result.append((t, lemma))
+            result.append(NormalizedToken(t, lemma))
 
         return result
 
@@ -170,5 +195,77 @@ class TruncationStemmer:
         :param text: str, text to tokenize and stem
         '''
         tokens = self.tokenizer.tokenize(text)
-        return [(t, t[:self.num_chars]) for t in tokens]
+        return [NormalizedToken(t, t[:self.num_chars]) for t in tokens]
 
+
+def pick_lemmatizer(choice):
+    '''Returns a lemmatizer object with default settings corresponding to
+    user input choice
+
+    :param choice: str, defined choice of lemmatizer to use
+    '''
+    if choice==PYMORPHY:
+        return Pymorphy2Lemmatizer()
+    elif choice==PYMYSTEM:
+        return Pymystem3Lemmatizer()
+    elif choice==SNOWBALL:
+        return SnowballStemmer()
+    elif choice==STANZA:
+        return SnowballStemmer()
+    elif choice==TRUNCATE:
+        return TruncationStemmer()
+    else:
+        raise ValueError(f"Stemmer choice '{choice}' is undefined")
+
+
+def main(tsv_in, text_col, tsv_out, lemmatizer):
+    '''
+
+    :param tsv_in: str, path to input tsv file
+    :param text_col: int, index of column to stem/lemmatize
+    :param tsv_out: str, path to output tsv file
+    :param lemmatizer: object with lemmatize(text) method
+    '''
+    print("Lemmatizing", tsv_in)
+    start = time.perf_counter()
+    docs_in = open(tsv_in, 'r', encoding='utf-8')
+    docs_out = open(tsv_out, 'w', encoding='utf-8')
+    tsv_reader = csv.reader(docs_in, delimiter='\t')
+    tsv_writer = csv.writer(docs_out, delimiter='\t')
+    for row in tsv_reader:
+        if tsv_reader.line_num % 10 == 0:
+            print("Reading line", tsv_reader.line_num)
+
+        text = row[text_col]
+        token_lemma_pairs = lemmatizer.lemmatize(text)
+        lemmatized_text = " ".join([p.normalized for p in token_lemma_pairs])
+        output_row = row[0:text_col] + [lemmatized_text] + row[text_col+1:]
+        tsv_writer.writerow(output_row)
+
+
+    docs_in.close()
+    docs_out.close()
+    end = time.perf_counter()
+    print(f"Lemmatization took {end-start:0.2f} seconds")
+
+
+parser = argparse.ArgumentParser(
+    description="Lemmatizes or stems a given TSV. Normalizes text in the specified column, copies over other columns")
+parser.add_argument('tsv_in',
+    help='Path to input TSV format.')
+parser.add_argument('tsv_out', help="Path to desired TSV output file.")
+parser.add_argument('--col', '-c',
+    help='Index of column to tokenize',
+    type=int,
+    default=2)
+parser.add_argument('--lemmatizer', '-l',
+    help='Choice of stemmer/lemmatizer',
+    choices=STEMMER_CHOICES)
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    print("Lemmatization method:", args.lemmatizer)
+    print(args)
+    main(args.tsv_in, args.col, args.tsv_out,
+        pick_lemmatizer(args.lemmatizer))
