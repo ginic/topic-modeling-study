@@ -10,7 +10,7 @@ GOGOL_VY= ('--  Паничи! паничи! сюды! сюды! -- говори�
 'на меду! сама пекла! 01234.2345, example@example.ru')
 
 def test_mallet_pattern():
-    t = tokenization.RegexTokenizer()
+    t = tokenization.RegexTokenizer(tokenization.MALLET_DEFAULT_TOKENIZATION)
     result = t.tokenize(GOGOL_VY)
     expected = ['Паничи', 'паничи', 'сюды', 'сюды', 'говорили', 'они',
         'всех', 'сторон', 'Ось', 'бублики', 'мак', 'овники', 'вертычки',
@@ -19,7 +19,7 @@ def test_mallet_pattern():
     assert result==expected
 
 def test_word_type_pattern():
-    t = tokenization.RegexTokenizer(tokenization.WORD_TYPE_TOKENIZATION)
+    t = tokenization.RegexTokenizer()
     result = t.tokenize(GOGOL_VY)
     expected = ['Паничи', 'паничи', 'сюды', 'сюды', 'говорили', 'они',
         'со', 'всех', 'сторон', 'Ось', 'бублики', 'мак', 'овники',

@@ -31,7 +31,7 @@ def clean_punctuation(text):
 class RegexTokenizer:
     '''Tokenizer relying on the regex library for compiling expressions.
     '''
-    def __init__(self, pattern=MALLET_DEFAULT_TOKENIZATION):
+    def __init__(self, pattern=WORD_TYPE_TOKENIZATION):
         self.pattern = regex.compile(pattern)
 
     def tokenize(self, text):
