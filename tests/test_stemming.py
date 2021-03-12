@@ -73,6 +73,13 @@ def test_pymystem3():
     helper_test_lemmatizer(lemmatizer)
 
 
+def test_pymorphy2():
+    '''Test Pymorphy2Lemmatizer
+    '''
+    lemmatizer  = topic_modeling.stemming.Pymorphy2Lemmatizer()
+    helper_test_lemmatizer(lemmatizer)
+
+
 def test_truncation():
     '''Test TruncationStemmer'''
     lemmatizer = topic_modeling.stemming.TruncationStemmer(num_chars=6)

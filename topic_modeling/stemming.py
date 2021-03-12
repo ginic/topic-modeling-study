@@ -4,6 +4,7 @@
 # TODO Pymorphy2
 '''
 import nltk.stem.snowball as nltkstem
+import pymorphy2
 import pymystem3
 import stanza
 
@@ -56,7 +57,7 @@ class SnowballStemmer:
         '''Instantiate NLTK Snowball stemmer. Default tokenizer
         is RegexTokenizer with WORD_TYPE_TOKENIZATION
 
-        :param tokenizer: object with a tokenize(str) method,
+        :param tokenizer: object with a tokenize(str) method
         '''
         self.tokenizer = tokenizer
         if self.tokenizer is None:
@@ -117,19 +118,34 @@ class Pymystem3Lemmatizer:
 
 
 class Pymorphy2Lemmatizer:
-    '''Wrapper around Pymorphy2Lemmatizer
+    '''Wrapper around Pymorphy2Lemmatizer. Default tokenizer
+    is RegexTokenizer with WORD_TYPE_TOKENIZATION
+
+    :param tokenizer: object with a tokenize(str) method
     '''
-    def __init__(self):
-        '''TODO
+    def __init__(self, tokenizer=None):
+        '''Instantiates pymorphy2 and specified tokenization.
         '''
-        pass
+        self.tokenizer = tokenizer
+        if self.tokenizer is None:
+            self.tokenizer = tokenization.RegexTokenizer()
+
+        self.analyzer = pymorphy2.MorphAnalyzer()
 
     def lemmatize(self, text):
-        '''Return list of (token, lemma) in text determined with pymorphy2
+        '''Return list of (token, lemma) in lemmatized with pymorphy2
 
-        :return: [description]
+        :param text: str, text to tokenize and lemmatize
         '''
-        pass
+        result = list()
+        tokens = self.tokenizer.tokenize(text)
+        for t in tokens:
+            parses = self.analyzer.parse(t)
+            # pymorphy isn't context aware, just take most likely form
+            lemma = parses[0].normal_form
+            result.append((t, lemma))
+
+        return result
 
 class TruncationStemmer:
     '''A naive strategy to stem by keeping the first num_chars number of
@@ -138,6 +154,7 @@ class TruncationStemmer:
     def __init__(self, tokenizer=None, num_chars=5):
         '''Instantiate TrucationStemmer. Default tokenizer
         is RegexTokenizer with WORD_TYPE_TOKENIZATION
+
         :param tokenizer: an object with a tokenize(str) method
         :param num_chars: int, word initial characters to keep, defaults to 5
         '''
