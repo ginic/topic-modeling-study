@@ -23,14 +23,14 @@ MIN_TERM_FREQ := 5
 # If any questions on maxIDF/maxIDF, check https://github.com/ginic/Mallet/blob/master/src/cc/mallet/classify/tui/Vectors2Vectors.java, lines 142-148
 MIN_IDF := 1.39
 FEATURE_SUFFIX := counts.tsv
-
+TOKEN_PATTERN := "[\p{L}]+[\p{P}\p{L}]+[\p{L}]|[\p{L}]+"
 # Topic modeling experiments with default settings
-MALLET_IMPORT_FLAGS := --keep-sequence
+MALLET_IMPORT_FLAGS := --keep-sequence --token-regex $(TOKEN_PATTERN)
 NUM_TOPICS := 100
 NUM_ITERS := 1000
 OPTIMIZE_INTERVAL := 20
 OPTIMIZE_BURN_IN := 50
-MALLET_TOPIC_FLAGS := --num-topics $(NUM_TOPICS) --num-iterations $(NUM_ITERS) --optimize-interval $(OPTIMIZE_INTERVAL) --optimize-burn-in $(OPTIMIZE_BURN_IN)
+MALLET_TOPIC_FLAGS := --num-topics $(NUM_TOPICS) --num-iterations $(NUM_ITERS) --optimize-interval $(OPTIMIZE_INTERVAL) --optimize-burn-in $(OPTIMIZE_BURN_IN) --token-regex $(TOKEN_PATTERN)
 
 # Naming conventions for topic models
 TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters

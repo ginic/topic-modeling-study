@@ -2,7 +2,7 @@
 '''Shared functionalities for stemming and lemmatization.
 The main/script will lemmatize or stem a given input TSV in Mallet format.
 
-# TODO output token,lemma,count to tsv
+# TODO output token,lemma,count to tsv/pickle to track lemmas/word types
 '''
 import argparse
 import csv
@@ -111,12 +111,11 @@ class Pymystem3Lemmatizer:
     >>>[{'analysis': [{'lex': 'этот', 'wt': 0.05565618415, 'gr': 'APRO=(вин,ед,сред|им,ед,сред)'}], 'text': 'это'},
        {'text': ' '}, {'analysis': [{'lex': 'предложение', 'wt': 1, 'gr': 'S,сред,неод=(вин,ед|им,ед)'}], 'text': 'предложение'}]
     '''
-    def __init__(self, keep_unanalyzed=False):
+    def __init__(self, keep_unanalyzed=True):
         '''Instantiate Mystem wrapper
 
-        :param keep_unanalyzed: True to also return non-whitespace
-            tokens that have no morphological analysis, such as numbers or
-            punctuation
+        :param keep_unanalyzed: True to also return non-whitespace and
+            non-punctuation tokens that have no morphological analysis, like numbers
         '''
         self.mystem = pymystem3.Mystem()
         self.keep_unanalyzed = keep_unanalyzed
@@ -132,13 +131,15 @@ class Pymystem3Lemmatizer:
         analysis = self.mystem.analyze(text)
         for a in analysis:
             token = a[PYMYSTEM_TEXT]
-            if PYMYSTEM_ANALYSIS in a:
+            if PYMYSTEM_ANALYSIS in a and len(a[PYMYSTEM_ANALYSIS]) > 0:
+                # Keep the highest scoring result
                 lexes = a[PYMYSTEM_ANALYSIS]
-                if len(lexes) > 1:
-                    raise StemmingError(f"Mystem returned multiple analyses, only 1 expected: {a}")
                 result.append(NormalizedToken(token, lexes[0][PYMYSTEM_LEX]))
-            elif self.keep_unanalyzed and not t.isspace() and t!='':
-                result.append(NormalizedToken(token, token))
+            elif self.keep_unanalyzed:
+                # Don't keep tokens that are only spaces or only punctuation
+                clean_token = tokenization.clean_punctuation(t)
+                if not clean_token.isspace() and clean_token!='':
+                    result.append(NormalizedToken(token, token))
         return result
 
 
@@ -211,7 +212,7 @@ def pick_lemmatizer(choice):
     elif choice==SNOWBALL:
         return SnowballStemmer()
     elif choice==STANZA:
-        return SnowballStemmer()
+        return StanzaLemmatizer()
     elif choice==TRUNCATE:
         return TruncationStemmer()
     else:
@@ -235,13 +236,11 @@ def main(tsv_in, text_col, tsv_out, lemmatizer):
     for row in tsv_reader:
         if tsv_reader.line_num % 10 == 0:
             print("Reading line", tsv_reader.line_num)
-
         text = row[text_col]
         token_lemma_pairs = lemmatizer.lemmatize(text)
         lemmatized_text = " ".join([p.normalized for p in token_lemma_pairs])
         output_row = row[0:text_col] + [lemmatized_text] + row[text_col+1:]
         tsv_writer.writerow(output_row)
-
 
     docs_in.close()
     docs_out.close()
