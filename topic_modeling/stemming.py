@@ -8,6 +8,7 @@ import argparse
 import csv
 from collections import namedtuple
 import time
+import traceback
 
 import nltk.stem.snowball as nltkstem
 import pymorphy2
@@ -25,7 +26,7 @@ TRUNCATE = 'truncate'
 STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE]
 
 # Desired stanza Russian modeling settings
-STANZA_SETTINGS = 'tokenize,lemma'
+STANZA_SETTINGS = 'tokenize,pos,lemma'
 STANZA_PACKAGE = 'syntagrus'
 
 PYMYSTEM_ANALYSIS = 'analysis'
@@ -229,6 +230,7 @@ def main(tsv_in, text_col, tsv_out, lemmatizer):
     '''
     print("Lemmatizing", tsv_in)
     start = time.perf_counter()
+    errors = 0
     docs_in = open(tsv_in, 'r', encoding='utf-8')
     docs_out = open(tsv_out, 'w', encoding='utf-8')
     tsv_reader = csv.reader(docs_in, delimiter='\t')
@@ -236,16 +238,24 @@ def main(tsv_in, text_col, tsv_out, lemmatizer):
     for row in tsv_reader:
         if tsv_reader.line_num % 10 == 0:
             print("Reading line", tsv_reader.line_num)
-        text = row[text_col]
-        token_lemma_pairs = lemmatizer.lemmatize(text)
-        lemmatized_text = " ".join([p.normalized for p in token_lemma_pairs])
-        output_row = row[0:text_col] + [lemmatized_text] + row[text_col+1:]
-        tsv_writer.writerow(output_row)
-
+        try:
+            text = row[text_col]
+            token_lemma_pairs = lemmatizer.lemmatize(text)
+            lemmatized_text = " ".join([p.normalized for p in token_lemma_pairs])
+            output_row = row[0:text_col] + [lemmatized_text] + row[text_col+1:]
+            tsv_writer.writerow(output_row)
+        except Exception as e:
+            errors +=1
+            print("Falure at line", tsv_reader.line_num)
+            print("Row text:")
+            print(row)
+            traceback.print_exc()
+            print("Document will be skipped.")
     docs_in.close()
     docs_out.close()
     end = time.perf_counter()
     print(f"Lemmatization took {end-start:0.2f} seconds")
+    print(f"Failure to process", errors, "document(s)")
 
 
 parser = argparse.ArgumentParser(
