@@ -6,11 +6,11 @@ certifi==2020.6.20
 cffi==1.14.0
 chardet==3.0.4
 click==7.1.2
-conda==4.9.0
-conda-package-handling==1.7.0
 cryptography==2.9.2
 cymem==2.0.3
 Cython==0.29.20
+DAWG-Python==0.7.2
+docopt==0.6.2
 flake8==3.5.0
 idna==2.9
 importlib-metadata==1.7.0
@@ -37,6 +37,9 @@ pycosat==0.6.3
 pycparser==2.20
 pyflakes==1.6.0
 pylint==2.6.0
+pymorphy2==0.9.1
+pymorphy2-dicts-ru==2.4.417127.4579844
+pymystem3==0.2.0
 pyOpenSSL==19.1.0
 pyparsing==2.4.7
 Pyphen==0.9.5
@@ -52,7 +55,7 @@ scipy==1.5.0
 six==1.14.0
 srsly==1.0.2
 # Points to Stanza dev commit with fix for https://github.com/stanfordnlp/stanza/issues/634
-git+git://github.com/stanfordnlp/stanza.git@726368644d7b1019825f915fabcfe1e4528e068e
+stanza @ git+git://github.com/stanfordnlp/stanza.git@726368644d7b1019825f915fabcfe1e4528e068e
 thinc==7.4.1
 toml==0.10.1
 torch==1.8.0

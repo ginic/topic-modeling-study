@@ -1,12 +1,16 @@
 # topic-modeling-study
 Independent study on topic modeling with a focus on investigating non-English literary corpora.
 
-# Dependencies
+# Dependencies for experiments
 - [Mallet](http://mallet.cs.umass.edu) should be installed with the class path
-- GNU Make to easily build corpus and topic experiments
+- [Make](https://en.wikipedia.org/wiki/Make_(software)) to easily build corpus and topic experiments (tested with GNU Make)
 
-# Installation
-Running `pip install .` using the python3 within the virtual environment of your choice should be sufficient. Installation instructions for Conda environments to come once more complicated dependencies are required.
+# Installation for python library
+TODO: Nice setup.py configuration.
+In the mean time:
+1. Create and activate python3 virtual environment. With conda is `conda create -n topic_modeling python=3.7`, then `conda activate topic_modeling` for an environment named `topic_modeling`
+2. Install specific requirements: `pip install -r requirements.txt`
+3. Run `pip install .` using the python3 within the virtual environment of your choice.
 
 # Build tools
 ## Building the corpus
@@ -33,4 +37,4 @@ Required options:
 - `OPTIMIZE_BURN_IN`: passed to Mallet's `--optimize-burn-in`
 
 ## Clean
-Running `make clean` removes the entire `CORPUS_TARGET` folder and all the experiments and corpus files it contains. Using `make experiments` will remove all experiments folders.
+Running `make clean` removes the entire `CORPUS_TARGET` folder and all the experiments and corpus files it contains. Using `make clean_experiments` will remove all experiments folders.
