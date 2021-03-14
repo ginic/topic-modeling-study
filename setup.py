@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+# TODO setup.cfg with all metadata and dependencies list
 
 setup(
     name='Topic Modeling Independent Study',

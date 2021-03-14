@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Experiment output folders
+libru_russian
+russian_novels
