@@ -16,6 +16,7 @@ MALLET_DEFAULT_TOKENIZATION=r"\p{L}[\p{L}\p{P}]+\p{L}"
 
 # Should allow punctuation between letters, otherwise punctuation is ignored
 WORD_TYPE_TOKENIZATION=r"[\p{L}\d]+[\p{P}\p{L}\d]+[\p{L}\d]|[\p{L}\d]+"
+WORD_TYPE_NO_DIGITS_TOKENIZATION=r"\p{L}+[\p{P}\p{L}]+\p{L}|\p{L}+"
 
 # Punctuation not in the middle of a word is kept in its own token
 KEEP_PUNCT_TOKENIZATION=r"[\p{L}\d]+[\p{P}\p{L}\d]+[\p{L}\d]|[\p{L}\d]+|\p{P}"
@@ -31,7 +32,7 @@ def clean_punctuation(text):
 class RegexTokenizer:
     '''Tokenizer relying on the regex library for compiling expressions.
     '''
-    def __init__(self, pattern=WORD_TYPE_TOKENIZATION):
+    def __init__(self, pattern=WORD_TYPE_NO_DIGITS_TOKENIZATION):
         self.pattern = regex.compile(pattern)
 
     def tokenize(self, text):
