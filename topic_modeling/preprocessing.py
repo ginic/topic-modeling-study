@@ -95,15 +95,15 @@ class DocumentSplitter(abc.ABC):
             author_file_count = len(self.token_counter[a])
             file_count += author_file_count
             print("Authorial stats for:", a)
-            print("\t", author_file_count, "files processed")
+            print(f"\t{author_file_count} file(s) processed")
             for f in self.token_counter[a]:
                 file_counter = self.token_counter[a][f]
                 vocab = set(file_counter)
                 num_tokens = sum(file_counter.values())
-                print("\tFile:", f, "Vocab size:", len(vocab), "Token counts:", num_tokens)
+                print(f"\tFile:'{f}'\tVocab size: {len(vocab)}\tToken counts: {num_tokens}")
                 author_tokens += num_tokens
                 author_vocab.update(vocab)
-            print("\t", a, "Total vocab size:", len(author_vocab), "Total tokens:", num_tokens)
+            print(f"\tAuthor: '{a}'\tTotal vocab size: {len(author_vocab)}\tTotal tokens: {author_tokens}")
             overall_tokens += author_tokens
             overall_vocab.update(author_vocab)
         print("---------------------------------------")
@@ -220,13 +220,17 @@ def main(tsv_output, input_dir, split_choice=WORD_COUNT_SPLITTER,
     :param tsv_output: Str, path to desired tsv output file
     :param input_dir: Str, path to directory containing input txt files
     """
+    print("Line splitter choice:", split_choice)
     if split_choice == LINE_BREAK_SPLITTER:
         splitter = LineBreakSplitter()
     elif split_choice == WORD_COUNT_SPLITTER:
-        splitter = WordCountSplitter(word_count)
+        splitter = WordCountSplitter(word_count=word_count)
+        print("Word (token) count for split documents:", word_count)
     elif split_choice == LINE_COUNT_SPLITTER:
         splitter = LineCountSplitter(line_count=line_count,
                                      min_word_count=word_count)
+        print("Minimum line count for split documents:", line_count)
+        print("Minimum word (token) count for split documents:", word_count)
     else:
         raise ValueError(f"Unsupported document splitting option:{split_choice}")
 

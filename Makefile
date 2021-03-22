@@ -30,7 +30,7 @@ NUM_TOPICS := 100
 NUM_ITERS := 1000
 OPTIMIZE_INTERVAL := 20
 OPTIMIZE_BURN_IN := 50
-MALLET_TOPIC_FLAGS := --num-topics $(NUM_TOPICS) --num-iterations $(NUM_ITERS) --optimize-interval $(OPTIMIZE_INTERVAL) --optimize-burn-in $(OPTIMIZE_BURN_IN) --token-regex $(TOKEN_PATTERN)
+MALLET_TOPIC_FLAGS := --num-topics $(NUM_TOPICS) --num-iterations $(NUM_ITERS) --optimize-interval $(OPTIMIZE_INTERVAL) --optimize-burn-in $(OPTIMIZE_BURN_IN)
 
 # Naming conventions for topic models
 TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
@@ -38,7 +38,8 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 # Preprocessing UTF-8 text files to Mallet TSV format
 %.tsv: $(TXT_CORPUS)
 	mkdir -p $(@D)
-	python topic_modeling/preprocessing.py $@ $<
+	python topic_modeling/preprocessing.py $@ $< > $*_preprocessing.out
+	tail -n 4 $*_preprocessing.out
 	@echo "Number of original files:"
 	@echo $(words $(wildcard $</*.txt))
 	@echo "Author ids in output:"
@@ -78,7 +79,9 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 	$(eval doc_topics := $(addsuffix _doc_topics.txt,$(file_base)))
 	$(eval topic_keys := $(addsuffix _topic_keys.txt,$(file_base)))
 	$(eval top_docs := $(addsuffix _top_docs.txt, $(file_base)))
+	$(eval diagnostics := $(addsuffix _diagnostics.xml,$(file_base)))
 	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs)
+	--diagnostics-file $(diagnostics)
 
 # Force all topic modeling files to depend on the output state file
 %.gz %.model %_doc_topics.txt %_topic_keys.txt : %
