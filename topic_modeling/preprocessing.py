@@ -1,5 +1,4 @@
 # coding=utf-8
-
 """Preprocessing non-English (primarily Russian, but theoretically this
 shouldn't matter) raw text for topic modeling.
 Options for splitting documents on blank lines or to a limited word count.
@@ -34,14 +33,21 @@ def get_author_label(doc_id):
     return doc_id.split('_')[0]
 
 class DocumentSplitter(abc.ABC):
-    def __init__(self, tokenizer=None):
-        self.token_counter = collections.Counter()
-        if tokenizer is None:
-            self.tokenizer = tokenization.RegexTokenizer()
+    '''Abstract base class for splitting documents.
+    Attributes are a tokenizer and token_counter which tracks token counts
+    by author for sanity checking.
+    The default tokenization is splitting on whitespace.
 
-    def split_doc(self, file_path, word_count=DEFAULT_WORD_COUNT,
-                  line_count=DEFAULT_LINE_COUNT):
-        """ Parses the document to Mallet format in the manner specified by
+    Subclasses must implement the process_file method.
+    '''
+    def __init__(self, tokenizer=None):
+        self.token_counter = collections.defaultdict(dict)
+        if tokenizer is None:
+            self.tokenizer = tokenization.RegexTokenizer(
+                tokenization.NON_WHITESPACE_TOKENIZATION)
+
+    def split_doc(self, file_path):
+        """Parses the document to Mallet format in the manner specified by
         split_choice.
 
         :param file_path: Path a particular text file
@@ -52,23 +58,67 @@ class DocumentSplitter(abc.ABC):
                                         (doc_id_1, label, text) ]
         :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
         """
+        # TODO Handling metadata here isn't ideal, move when more info on metdata
         doc_id = file_path.stem
         author_label = get_author_label(doc_id)
-        # TODO
-        # split_text = self.process_file()
+        # Count up tokens for this document
+        # word type -> count for this file
+        counter = collections.Counter()
+        parsed_doc = self.process_file(file_path)
+        for d in parsed_doc:
+            counter.update(d)
+        self.token_counter[author_label][doc_id] = counter
 
-
-        # TODO Handling metadata here isn't ideal, move when more info on metadata
         num_docs = len(parsed_doc)
         doc_ids = [f'{doc_id}_{i}' for i in range(num_docs)]
-        return list(zip(doc_ids, [author_label] * num_docs, parsed_doc))
+        joined_docs = [' '.join(l) for l in parsed_doc]
+        return list(zip(doc_ids, [author_label] * num_docs, joined_docs))
 
     @abc.abstractmethod
-    def process_file(self, line):
+    def process_file(self, file_path):
+        '''Implementation to process the individual file into smaller documents and update `token_counter` during the process
+        :returns: A list of lists of tokens
+            [[doc1_token1, doc1_token2,...], [doc2_token1, doc2_token2...]]
+        '''
         pass
 
-class LineCountSplitter(DocumentSplitter):
+    def print_authorial_statistics(self):
+        '''Prints the document, vocab and token count statistics for each author
+        collected by this DocSplitter for each input file.
+        '''
+        overall_tokens = 0
+        overall_vocab = set()
+        file_count = 0
+        for a in self.token_counter.keys():
+            author_tokens = 0
+            author_vocab = set()
+            author_file_count = len(self.token_counter[a])
+            file_count += author_file_count
+            print("Authorial stats for:", a)
+            print("\t", author_file_count, "files processed")
+            for f in self.token_counter[a]:
+                file_counter = self.token_counter[a][f]
+                vocab = set(file_counter)
+                num_tokens = sum(file_counter.values())
+                print("\tFile:", f, "Vocab size:", len(vocab), "Token counts:", num_tokens)
+                author_tokens += num_tokens
+                author_vocab.update(vocab)
+            print("\t", a, "Total vocab size:", len(author_vocab), "Total tokens:", num_tokens)
+            overall_tokens += author_tokens
+            overall_vocab.update(author_vocab)
+        print("---------------------------------------")
+        print("Summary over all authors:")
+        print("Total files processed:", file_count)
+        print("Vocab size:", len(overall_vocab))
+        print("Token count:", overall_tokens)
 
+
+class LineCountSplitter(DocumentSplitter):
+    '''Raw text file broken down into snippets that are at least `line_count` lines long and at least `min_word_count`
+    word types in length.
+
+    Attributes inherited from DocumentSplitter are a tokenizer and token_counter.
+    '''
     def __init__(self, tokenizer=None, line_count=DEFAULT_LINE_COUNT,
                  min_word_count=DEFAULT_WORD_COUNT):
         self.line_count = line_count
@@ -77,14 +127,11 @@ class LineCountSplitter(DocumentSplitter):
 
 
     def process_file(self, file_path):
-        """Raw text file broken down into snippets that are at least 'line_count'
-        lines long and at least 'min_word_count' word types in length.
+        """Raw text file broken down into snippets that are at least `line_count`
+        lines long and at least `min_word_count` word types in length.
 
         :param file_path: Path a particular text file
-        :param line_count: int, min number of lines allowed in snippet
-        :param min_word_count: int, min number of words allowed in snippet (except for last snippet)
-        :returns: List of tupes like [ [doc_id_0, label, text],
-                                        [doc_id_1, label, text] ]
+        :returns: List of lists of tokens
         :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
         """
         results = []
@@ -103,40 +150,37 @@ class LineCountSplitter(DocumentSplitter):
             while token_count < self.min_word_count and end < num_lines:
                 end += 1
                 token_count += len(tokenized_lines[end - 1])
-            text = ' '.join([' '.join(l) for l in tokenized_lines[start:end]])
-            results.append(text)
+            results.append([t for l in tokenized_lines[start:end] for t in l])
             start = end
             end = start + self.line_count
 
         # There could be a final snippet with length < min_word_count, let's keep it
         if tokenized_lines[start:end] != []:
-            text = ' '.join([' '.join(l) for l in tokenized_lines[start:]])
-            results.append(text)
+            results.append([t for l in tokenized_lines[start:] for t in l])
 
         return results
 
 class WordCountSplitter(DocumentSplitter):
-
+    '''Breaks raw text file down into snippets that are the length of the
+    specified word_count.
+    Attributes inherited from DocumentSplitter are a tokenizer and token_counter.
+    '''
     def __init__(self, tokenizer=None, word_count=DEFAULT_LINE_COUNT):
         self.word_count=word_count
         super().__init__(tokenizer)
 
     def process_file(self, file_path):
-        """Raw text file broken down to snippets of size of word_count word types
-        deliniated by white space.
-        For now, doc_id (doc name) is the label.
+        """Raw text file broken down to snippets of size of word_count.
 
         :param file_path: Path a particular text file
-        :param word_count: int marking the number of words to subdivide documents
-        :returns: List of lists like [ [doc_id_0, label, text],
-                                        [doc_id_1, label, text] ]
+        :returns: List of lists of tokens
         :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
         """
         results = []
         # Individual documents shouldn't be big enough for this to cause problems
         split_text = self.tokenizer.tokenize(file_path.read_text(encoding='utf-8'))
         for i in range(0, len(split_text), self.word_count):
-            results.append(' '.join(split_text[i:i + self.word_count]))
+            results.append(split_text[i:i + self.word_count])
 
         return results
 
@@ -148,11 +192,10 @@ class LineBreakSplitter(DocumentSplitter):
         For now, doc_id (doc name) is the label.
 
         :param file_path: Path a particular text file
-        :returns: List of document snippets [ text1, text2 ]
+        :returns: List of lists of tokens
         :raise: UnicodeDecodeError if file isn't UTF-8 decodeable
         """
         results = []
-        doc_id = file_path.stem
         with open(file_path, mode='r', encoding='utf-8') as doc_in:
             snippet = ''
             for line in doc_in:
@@ -160,12 +203,12 @@ class LineBreakSplitter(DocumentSplitter):
                     clean_line = line.replace('\t', ' ').strip()
                     snippet = ' '.join([snippet, clean_line]).strip()
                 elif line.isspace() and snippet != '':
-                    results.append(snippet)
+                    results.append(self.tokenizer.tokenize(snippet))
                     snippet = ''
 
         # If documents don't end in blank lines, add the last snippet
         if not snippet.isspace():
-            results.append(snippet)
+            results.append(self.tokenizer.tokenize(snippet))
 
         return results
 
@@ -191,11 +234,14 @@ def main(tsv_output, input_dir, split_choice=WORD_COUNT_SPLITTER,
     with open(tsv_output, mode='a', encoding='utf-8') as tsv_out:
         for document in input_dir_path.glob('*.txt'):
             try:
-                print("Parsing doc:", document)
+                print("Parsing file:", document)
                 parsed_doc = splitter.split_doc(document)
+                print("File", document, "split into", len(parsed_doc), "documents")
                 tsv_out.writelines(['\t'.join(l) + '\n' for l in parsed_doc])
             except UnicodeDecodeError as e:
                 print(document, "doesn't appear to be in UTF-8, skipping. Error:", e)
+
+    splitter.print_authorial_statistics()
 
 
 parser = argparse.ArgumentParser(description="Preprocessing of text for topic modeling with Mallet")

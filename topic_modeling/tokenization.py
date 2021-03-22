@@ -21,6 +21,9 @@ WORD_TYPE_NO_DIGITS_TOKENIZATION=r"\p{L}+[\p{P}\p{L}]+\p{L}|\p{L}+"
 # Punctuation not in the middle of a word is kept in its own token
 KEEP_PUNCT_TOKENIZATION=r"[\p{L}\d]+[\p{P}\p{L}\d]+[\p{L}\d]|[\p{L}\d]+|\p{P}"
 
+# Just split tokens on whitespace
+NON_WHITESPACE_TOKENIZATION=r"\S+"
+
 def clean_punctuation(text):
     '''Returns a string that matches the input text with punctuation removed
 

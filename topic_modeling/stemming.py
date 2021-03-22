@@ -138,7 +138,7 @@ class Pymystem3Lemmatizer:
                 result.append(NormalizedToken(token, lexes[0][PYMYSTEM_LEX]))
             elif self.keep_unanalyzed:
                 # Don't keep tokens that are only spaces or only punctuation
-                clean_token = tokenization.clean_punctuation(t)
+                clean_token = tokenization.clean_punctuation(token)
                 if not clean_token.isspace() and clean_token!='':
                     result.append(NormalizedToken(token, token))
         return result
