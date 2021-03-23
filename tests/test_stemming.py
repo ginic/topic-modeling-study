@@ -119,6 +119,6 @@ def test_stem_counter_to_df():
     stem_counter.update('Bulgakov', example_lemmas)
     stem_counter.update('Tolstoy', example_lemmas)
     result_df = stem_counter.to_dataframe()
-    expected_df = pd.DataFrame({'author':['Bulgakov', 'Bulgakov', 'Tolstoy', 'Tolstoy'], 'token':['жаркого', 'Москве', 'жаркого', 'Москве'], 'normalized':['жаркий', 'Москва', 'жаркий', 'Москва'], "count":[2,2,1,1]})
+    expected_df = pd.DataFrame({'author':['Bulgakov', 'Bulgakov', 'Tolstoy', 'Tolstoy'], 'token':['жаркого', 'москве', 'жаркого', 'москве'], 'normalized':['жаркий', 'москва', 'жаркий', 'москва'], "count":[2,2,1,1]})
     assert result_df.equals(expected_df)
 

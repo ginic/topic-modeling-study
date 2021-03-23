@@ -41,31 +41,34 @@ NormalizedToken = collections.namedtuple('NormalizedToken', 'token normalized')
 
 
 class ByAuthorStemCounts:
-    '''Maps author to term frequencies for easily generating by-author statistics
+    '''Maps author to term frequencies for easily generating by-author statistics.
+    All tokens and lemmas are downcased, since that's what Mallet does
     '''
 
     def __init__(self):
         self.author_map = collections.defaultdict(collections.Counter)
 
     def update(self, author, token_stem_pairs):
-        '''Updates frequency counts of this authr for the given
+        '''Updates frequency counts of this author for the given
         list of NormalizedToken pairs
 
         :param author: str, name of author to add stats for
         :param token_stem_pairs: list of NormalizedToken tuples
         '''
-        self.author_map[author].update(token_stem_pairs)
+        self.author_map[author].update([(t[0].lower(), t[1].lower()) for t in token_stem_pairs])
 
     def to_dataframe(self):
         '''Returns the author_map as a pandas dataframe
-        with columns for author, original token, normalized token (stem or lemma) and counts
+        with columns for author, original token, normalized token
+        (stem or lemma) and counts
         '''
         records = list()
         for author in self.author_map:
             for token_pair, count in self.author_map[author].items():
-                records.append((author, token_pair.token, token_pair.normalized, count))
+                records.append((author, token_pair[0], token_pair[1], count))
 
-        return pd.DataFrame.from_records(records, columns=['author', 'token','normalized','count'])
+        return pd.DataFrame.from_records(records,
+                    columns=['author', 'token','normalized','count'])
 
 
 class StemmingError(Exception):
