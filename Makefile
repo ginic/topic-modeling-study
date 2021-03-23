@@ -38,7 +38,7 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 # Preprocessing UTF-8 text files to Mallet TSV format
 %.tsv: $(TXT_CORPUS)
 	mkdir -p $(@D)
-	python topic_modeling/preprocessing.py $@ $< > $*_preprocessing.out
+	python topic_modeling/preprocessing.py $@ $< --pickle-counts $*_tokens.pickle > $*_preprocessing.out
 	tail -n 4 $*_preprocessing.out
 	@echo "Number of original files:"
 	@echo $(words $(wildcard $</*.txt))

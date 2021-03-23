@@ -15,6 +15,7 @@ import abc
 import argparse
 import collections
 import pathlib
+import pickle
 import sys
 
 import topic_modeling.tokenization as tokenization
@@ -35,8 +36,9 @@ def get_author_label(doc_id):
 class DocumentSplitter(abc.ABC):
     '''Abstract base class for splitting documents.
     Attributes are a tokenizer and token_counter which tracks token counts
-    by author for sanity checking.
+    by author and file for sanity checking.
     The default tokenization is splitting on whitespace.
+    The token_counter maps {author:{doc id:Counter({token:term freq within doc})}}
 
     Subclasses must implement the process_file method.
     '''
@@ -214,11 +216,16 @@ class LineBreakSplitter(DocumentSplitter):
 
 
 def main(tsv_output, input_dir, split_choice=WORD_COUNT_SPLITTER,
-         word_count=DEFAULT_WORD_COUNT, line_count=DEFAULT_LINE_COUNT):
+         word_count=DEFAULT_WORD_COUNT, line_count=DEFAULT_LINE_COUNT,
+         pickle_counts_path=None):
     """Given a directory of input text files, breaks documents into '
     paragraphs' and outputs a Mallet format TSV file.
-    :param tsv_output: Str, path to desired tsv output file
-    :param input_dir: Str, path to directory containing input txt files
+    :param tsv_output: str, path to desired tsv output file
+    :param input_dir: str, path to directory containing input txt files
+    :param split_choice: str, option for chooseing document split method
+    :param word_count: int, exact word count for WordCountSlitter and minimum_word_count for LineCountSplitter
+    :param line_count: int, minimum line count for LineCountSplitter
+    :param pickle_counts_path: str, optional path to a file for pickling the token count mapping
     """
     print("Line splitter choice:", split_choice)
     if split_choice == LINE_BREAK_SPLITTER:
@@ -247,6 +254,10 @@ def main(tsv_output, input_dir, split_choice=WORD_COUNT_SPLITTER,
 
     splitter.print_authorial_statistics()
 
+    if pickle_counts_path:
+        with open(pickle_counts_path, 'wb') as f:
+            pickle.dump(splitter.token_counter, f)
+
 
 parser = argparse.ArgumentParser(description="Preprocessing of text for topic modeling with Mallet")
 parser.add_argument(
@@ -271,8 +282,12 @@ parser.add_argument(
     default=DEFAULT_LINE_COUNT,
     help="Minimum number of lines "
 )
+parser.add_argument(
+    '--pickle-counts', '-p',
+    help="Optional path to pickle token counts by author and file"
+)
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(args.tsv_output, args.corpus_directory, args.splitter, args.word_count)
+    main(args.tsv_output, args.corpus_directory, args.splitter, args.word_count, args.line_count, args.pickle_counts)

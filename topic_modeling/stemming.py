@@ -2,7 +2,7 @@
 '''Shared functionalities for stemming and lemmatization.
 The main/script will lemmatize or stem a given input TSV in Mallet format.
 
-# TODO output token,lemma,count to tsv/pickle to track lemmas/word types
+# TODO output author,token,lemma,count to tsv
 '''
 import argparse
 import csv
@@ -220,7 +220,7 @@ def pick_lemmatizer(choice):
         raise ValueError(f"Stemmer choice '{choice}' is undefined")
 
 
-def main(tsv_in, text_col, tsv_out, lemmatizer):
+def main(tsv_in, text_col, tsv_out, lemmatizer, author_col):
     '''
 
     :param tsv_in: str, path to input tsv file
@@ -267,6 +267,11 @@ parser.add_argument('--col', '-c',
     help='Index of column to tokenize',
     type=int,
     default=2)
+parser.add_argument('--author-col', '-a',
+    help='Index of column with author metadata',
+    type=int,
+    default=1
+)
 parser.add_argument('--lemmatizer', '-l',
     help='Choice of stemmer/lemmatizer',
     choices=STEMMER_CHOICES)
@@ -277,4 +282,4 @@ if __name__ == "__main__":
     print("Lemmatization method:", args.lemmatizer)
     print(args)
     main(args.tsv_in, args.col, args.tsv_out,
-        pick_lemmatizer(args.lemmatizer))
+        pick_lemmatizer(args.lemmatizer), args.author_col)
