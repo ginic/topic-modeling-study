@@ -10,6 +10,9 @@ TXT_CORPUS := ~/workspace/RussianNovels/corpus
 # Dir name for corpus & Mallet output
 CORPUS_TARGET := russian_novels
 #CORPUS_TARGET := libru_russian
+#CORPUS_TARGET := russian_novels_snowball
+STEM_METHOD := snowball
+STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
 # TODO: Target to output correlations files
@@ -69,6 +72,11 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 %_stopped.txt: %_vocab.txt %_pruned_vocab.txt
 	comm -23 $^ > $@
 
+# Build a stemmed version of the Mallet corpus
+$(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
+	mkdir -p $(STEM_CORPUS)
+	python topic_modeling/stemming.py $< $(STEM_CORPUS)/$(STEM_CORPUS).tsv $(STEM_CORPUS)/$(STEM_CORPUS)_lemma_counts.tsv --lemmatizer $(STEM_METHOD) > $(STEM_CORPUS)/stemming.out
+
 # Build a topic model and save topic state from the pruned corpus
 # These are probably fragile, don't use with parallel make
 %_$(TOPIC_EXPERIMENT_ID): %_pruned.mallet
@@ -80,8 +88,7 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 	$(eval topic_keys := $(addsuffix _topic_keys.txt,$(file_base)))
 	$(eval top_docs := $(addsuffix _top_docs.txt, $(file_base)))
 	$(eval diagnostics := $(addsuffix _diagnostics.xml,$(file_base)))
-	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs)
-	--diagnostics-file $(diagnostics)
+	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics)
 
 # Force all topic modeling files to depend on the output state file
 %.gz %.model %_doc_topics.txt %_topic_keys.txt : %
@@ -96,16 +103,21 @@ experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
 # Sorry about this mess -_-
 corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET).mallet $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(FEATURE_SUFFIX) $(CORPUS_TARGET)/$(CORPUS_TARGET)_vocab.txt $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned_vocab.txt  $(CORPUS_TARGET)/$(CORPUS_TARGET)_stopped.txt
 
-# Cleans up the default corpus target
+# Convenience function for building both the stemmed corpus and mallet files
+# for stemmed corpus
+stemmed_corpus: $(STEM_CORPUS)/$(STEM_CORPUS).tsv $(STEM_CORPUS)/$(STEM_CORPUS)_pruned.mallet $(STEM_CORPUS)/$(STEM_CORPUS)_pruned_$(FEATURE_SUFFIX) $(STEM_CORPUS)/$(STEM_CORPUS).mallet $(STEM_CORPUS)/$(STEM_CORPUS)_$(FEATURE_SUFFIX) $(STEM_CORPUS)/$(STEM_CORPUS)_vocab.txt $(STEM_CORPUS)/$(STEM_CORPUS)_pruned_vocab.txt  $(STEM_CORPUS)/$(STEM_CORPUS)_stopped.txt
+
+# Cleans up the default corpus target and stemmed corpus target
 clean:
 	rm -r $(CORPUS_TARGET)
+	rm -r $(STEM_CORPUS)
 
 # Cleans up experiment folders only
 clean_experiments:
 	rm -r $(CORPUS_TARGET)/$(CORPUS_TARGET)_*topics_*iters
 
 
-.PHONY: clean experiment corpus clean_experiments
+.PHONY: clean experiment corpus clean_experiments stemmed_corpus
 
 # Don't ever clean up .tsv or .mallet files
 .PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX)
