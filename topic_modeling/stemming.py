@@ -1,16 +1,18 @@
 # coding=utf-8
 '''Shared functionalities for stemming and lemmatization.
-The main/script will lemmatize or stem a given input TSV in Mallet format.
-
-# TODO output author,token,lemma,count to tsv
+The main/script will lemmatize or stem a given input TSV in Mallet format
+and produced another TSV in Mallet format with appropriately normalized text
+and a TSV with counts of each (token,lemma) pair by author.
 '''
+import abc
 import argparse
 import csv
-from collections import namedtuple
+import collections
 import time
 import traceback
 
 import nltk.stem.snowball as nltkstem
+import pandas as pd
 import pymorphy2
 import pymystem3
 import stanza
@@ -29,17 +31,46 @@ STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE]
 STANZA_SETTINGS = 'tokenize,pos,lemma'
 STANZA_PACKAGE = 'syntagrus'
 
+# Pymystem keys
 PYMYSTEM_ANALYSIS = 'analysis'
 PYMYSTEM_LEX = 'lex'
 PYMYSTEM_TEXT = 'text'
 
 # Container for tokens and their corresponding stem or lemma
-NormalizedToken = namedtuple('NormalizedToken', 'token normalized')
+NormalizedToken = collections.namedtuple('NormalizedToken', 'token normalized')
+
+
+class ByAuthorStemCounts:
+    '''Maps author to term frequencies for easily generating by-author statistics
+    '''
+
+    def __init__(self):
+        self.author_map = collections.defaultdict(collections.Counter)
+
+    def update(self, author, token_stem_pairs):
+        '''Updates frequency counts of this authr for the given
+        list of NormalizedToken pairs
+
+        :param author: str, name of author to add stats for
+        :param token_stem_pairs: list of NormalizedToken tuples
+        '''
+        self.author_map[author].update(token_stem_pairs)
+
+    def to_dataframe(self):
+        '''Returns the author_map as a pandas dataframe
+        with columns for author, original token, normalized token (stem or lemma) and counts
+        '''
+        records = list()
+        for author in self.author_map:
+            for token_pair, count in self.author_map[author].items():
+                records.append((author, token_pair.token, token_pair.normalized, count))
+
+        return pd.DataFrame.from_records(records, columns=['author', 'token','normalized','count'])
+
 
 class StemmingError(Exception):
     '''Raised when underlying stemmers do not behave as expected'''
     pass
-
 
 class StanzaLemmatizer:
     '''Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
@@ -174,6 +205,7 @@ class Pymorphy2Lemmatizer:
 
         return result
 
+
 class TruncationStemmer:
     '''A naive strategy to stem by keeping the first num_chars number of
     characters in a word
@@ -220,17 +252,20 @@ def pick_lemmatizer(choice):
         raise ValueError(f"Stemmer choice '{choice}' is undefined")
 
 
-def main(tsv_in, text_col, tsv_out, lemmatizer, author_col):
+def main(tsv_in, text_col, tsv_out, count_tsv, lemmatizer, author_col):
     '''
 
     :param tsv_in: str, path to input tsv file
     :param text_col: int, index of column to stem/lemmatize
-    :param tsv_out: str, path to output tsv file
+    :param tsv_out: str, path to output tsv file for normalized text
+    :param count_tsv: str, path to output tsv file for counts of token, lemma pairs by author
     :param lemmatizer: object with lemmatize(text) method
+    :param author_col: int, index of column with author label
     '''
     print("Lemmatizing", tsv_in)
     start = time.perf_counter()
     errors = 0
+    stem_counter = ByAuthorStemCounts()
     docs_in = open(tsv_in, 'r', encoding='utf-8')
     docs_out = open(tsv_out, 'w', encoding='utf-8')
     tsv_reader = csv.reader(docs_in, delimiter='\t')
@@ -239,11 +274,15 @@ def main(tsv_in, text_col, tsv_out, lemmatizer, author_col):
         if tsv_reader.line_num % 10 == 0:
             print("Reading line", tsv_reader.line_num)
         try:
+            # Find lemmas and write to output
             text = row[text_col]
             token_lemma_pairs = lemmatizer.lemmatize(text)
             lemmatized_text = " ".join([p.normalized for p in token_lemma_pairs])
             output_row = row[0:text_col] + [lemmatized_text] + row[text_col+1:]
             tsv_writer.writerow(output_row)
+            # Update counts
+            author = row[author_col]
+            stem_counter.update(author, token_lemma_pairs)
         except Exception as e:
             errors +=1
             print("Falure at line", tsv_reader.line_num)
@@ -256,19 +295,22 @@ def main(tsv_in, text_col, tsv_out, lemmatizer, author_col):
     end = time.perf_counter()
     print(f"Lemmatization took {end-start:0.2f} seconds")
     print(f"Failure to process", errors, "document(s)")
+    print(f"Writing out lemma counts by author to", count_tsv)
+    stem_counter.to_dataframe().to_csv(count_tsv, sep="\t", index=False)
 
 
 parser = argparse.ArgumentParser(
     description="Lemmatizes or stems a given TSV. Normalizes text in the specified column, copies over other columns")
 parser.add_argument('tsv_in',
     help='Path to input TSV format.')
-parser.add_argument('tsv_out', help="Path to desired TSV output file.")
+parser.add_argument('tsv_out', help="Path to desired TSV output file for stemmed/lemmatized text in Mallet format.")
+parser.add_argument('count_tsv', help="Path to tsv for storing counts of token, lemma pairs by author")
 parser.add_argument('--col', '-c',
-    help='Index of column to tokenize',
+    help='Index of column to tokenize, default is 2',
     type=int,
     default=2)
 parser.add_argument('--author-col', '-a',
-    help='Index of column with author metadata',
+    help='Index of column with author metadata, default is 1',
     type=int,
     default=1
 )
@@ -281,5 +323,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("Lemmatization method:", args.lemmatizer)
     print(args)
-    main(args.tsv_in, args.col, args.tsv_out,
+    main(args.tsv_in, args.col, args.tsv_out, args.count_tsv,
         pick_lemmatizer(args.lemmatizer), args.author_col)
