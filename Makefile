@@ -10,8 +10,9 @@ TXT_CORPUS := ~/workspace/RussianNovels/corpus
 # Dir name for corpus & Mallet output
 CORPUS_TARGET := russian_novels
 #CORPUS_TARGET := libru_russian
-#CORPUS_TARGET := russian_novels_snowball
-STEM_METHOD := snowball
+
+# Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
+STEM_METHOD := pymystem3
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
@@ -107,6 +108,9 @@ corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPU
 # for stemmed corpus
 stemmed_corpus: $(STEM_CORPUS)/$(STEM_CORPUS).tsv $(STEM_CORPUS)/$(STEM_CORPUS)_pruned.mallet $(STEM_CORPUS)/$(STEM_CORPUS)_pruned_$(FEATURE_SUFFIX) $(STEM_CORPUS)/$(STEM_CORPUS).mallet $(STEM_CORPUS)/$(STEM_CORPUS)_$(FEATURE_SUFFIX) $(STEM_CORPUS)/$(STEM_CORPUS)_vocab.txt $(STEM_CORPUS)/$(STEM_CORPUS)_pruned_vocab.txt  $(STEM_CORPUS)/$(STEM_CORPUS)_stopped.txt
 
+# Builds topic models from stemmed corpus
+stemmed_experiment: $(STEM_CORPUS)/$(STEM_CORPUS)_$(TOPIC_EXPERIMENT_ID)
+
 # Cleans up the default corpus target and stemmed corpus target
 clean:
 	rm -r $(CORPUS_TARGET)
@@ -115,9 +119,10 @@ clean:
 # Cleans up experiment folders only
 clean_experiments:
 	rm -r $(CORPUS_TARGET)/$(CORPUS_TARGET)_*topics_*iters
+	rm -r $(STEM_CORPUS)/$(STEM_CORPUS)_*topics_*iters
 
 
-.PHONY: clean experiment corpus clean_experiments stemmed_corpus
+.PHONY: clean experiment corpus clean_experiments stemmed_corpus stemmed_experiment
 
 # Don't ever clean up .tsv or .mallet files
 .PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX)
