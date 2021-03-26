@@ -146,7 +146,7 @@ class Pymystem3Lemmatizer:
     >>>[{'analysis': [{'lex': 'этот', 'wt': 0.05565618415, 'gr': 'APRO=(вин,ед,сред|им,ед,сред)'}], 'text': 'это'},
        {'text': ' '}, {'analysis': [{'lex': 'предложение', 'wt': 1, 'gr': 'S,сред,неод=(вин,ед|им,ед)'}], 'text': 'предложение'}]
     '''
-    def __init__(self, keep_unanalyzed=True):
+    def __init__(self, keep_unanalyzed=False):
         '''Instantiate Mystem wrapper
 
         :param keep_unanalyzed: True to also return non-whitespace and
