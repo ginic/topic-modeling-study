@@ -12,7 +12,7 @@ CORPUS_TARGET := russian_novels
 #CORPUS_TARGET := libru_russian
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
-STEM_METHOD := truncate
+STEM_METHOD := snowball
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo

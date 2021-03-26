@@ -112,7 +112,7 @@ class SnowballStemmer:
     '''
     def __init__(self, tokenizer=None):
         '''Instantiate NLTK Snowball stemmer. Default tokenizer
-        is RegexTokenizer with WORD_TYPE_TOKENIZATION
+        is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
         :param tokenizer: object with a tokenize(str) method
         '''
@@ -180,7 +180,7 @@ class Pymystem3Lemmatizer:
 
 class Pymorphy2Lemmatizer:
     '''Wrapper around Pymorphy2Lemmatizer. Default tokenizer
-    is RegexTokenizer with WORD_TYPE_TOKENIZATION
+    is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
     :param tokenizer: object with a tokenize(str) method
     '''
@@ -215,7 +215,7 @@ class TruncationStemmer:
     '''
     def __init__(self, tokenizer=None, num_chars=5):
         '''Instantiate TrucationStemmer. Default tokenizer
-        is RegexTokenizer with WORD_TYPE_TOKENIZATION
+        is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
         :param tokenizer: an object with a tokenize(str) method
         :param num_chars: int, word initial characters to keep, defaults to 5
@@ -271,24 +271,25 @@ def main(tsv_in, text_col, tsv_out, count_tsv, lemmatizer, author_col):
     stem_counter = ByAuthorStemCounts()
     docs_in = open(tsv_in, 'r', encoding='utf-8')
     docs_out = open(tsv_out, 'w', encoding='utf-8')
-    tsv_reader = csv.reader(docs_in, delimiter='\t')
-    tsv_writer = csv.writer(docs_out, delimiter='\t')
-    for row in tsv_reader:
-        if tsv_reader.line_num % 10 == 0:
-            print("Reading line", tsv_reader.line_num)
+    line_count = 1
+    for row in docs_in:
+        if line_count % 10 == 0:
+            print("Reading line", line_count)
         try:
+            split_row = row.strip().split('\t')
             # Find lemmas and write to output
-            text = row[text_col]
+            text = split_row[text_col]
             token_lemma_pairs = lemmatizer.lemmatize(text)
             lemmatized_text = " ".join([p.normalized for p in token_lemma_pairs])
-            output_row = row[0:text_col] + [lemmatized_text] + row[text_col+1:]
-            tsv_writer.writerow(output_row)
+            output_row = split_row[0:text_col] + [lemmatized_text] + split_row[text_col+1:]
+            docs_out.write("\t".join(output_row) + "\n")
             # Update counts
-            author = row[author_col]
+            author = split_row[author_col]
             stem_counter.update(author, token_lemma_pairs)
+            line_count += 1
         except Exception as e:
             errors +=1
-            print("Falure at line", tsv_reader.line_num)
+            print("Falure at line", line_count)
             print("Row text:")
             print(row)
             traceback.print_exc()
@@ -303,9 +304,9 @@ def main(tsv_in, text_col, tsv_out, count_tsv, lemmatizer, author_col):
 
 
 parser = argparse.ArgumentParser(
-    description="Lemmatizes or stems a given TSV. Normalizes text in the specified column, copies over other columns")
+    description="Lemmatizes or stems a given TSV. Normalizes text in the specified column, copies over other columns.")
 parser.add_argument('tsv_in',
-    help='Path to input TSV format.')
+    help='Path to input TSV. Reading expects no escaping, just splits on every tab character')
 parser.add_argument('tsv_out', help="Path to desired TSV output file for stemmed/lemmatized text in Mallet format.")
 parser.add_argument('count_tsv', help="Path to tsv for storing counts of token, lemma pairs by author")
 parser.add_argument('--col', '-c',
