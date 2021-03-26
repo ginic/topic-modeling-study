@@ -10,6 +10,7 @@ contains UTF-8 text files
 TODO: This assumes everything is written in UTF-8 and skips undecodeable files,
       but we might have to deal with Windows-1251 too eventually
 TODO: Properly choose metadata for column 2 given a metadata input file
+TODO: Author counts map to its own object for cleanness & usability
 """
 import abc
 import argparse
@@ -17,6 +18,8 @@ import collections
 import pathlib
 import pickle
 import sys
+
+import pandas as pd
 
 import topic_modeling.tokenization as tokenization
 
@@ -26,11 +29,39 @@ WORD_COUNT_SPLITTER = 'word_count'
 LINE_BREAK_SPLITTER = 'line_break'
 LINE_COUNT_SPLITTER = 'line_count'
 
+def unpickle_author_counts(pickle_path):
+    '''Returns a unpickled DocumentSplitter.token_counter
+    map {author:{doc id:Counter({token:term freq within doc})}}
+
+    :param pickle_path: Path to pickled DocumentSplitter.token_counter
+    '''
+    with open(pickle_path, 'rb') as f:
+        return pickle.load(f)
+
+def author_counts_as_dataframe(author_counts_map, keep_doc_col=False):
+    '''Given an token_counter map from Document splitter, transforms
+    into pandas frame with columns: author, token, count.
+    There is also an option to keep break down by document id.
+
+    :param author_counts_map: dict, {author:{doc id:Counter({token:term freq within doc})}}
+    :param keep_doc_col: boolean, defaults to False. Set to true to keep breakdown by doc_id
+    '''
+    records = list()
+    for a, doc_counts in author_counts_map.items():
+        author_count = collections.Counter()
+        for _, counts in doc_counts.items():
+            author_count = author_count | counts
+
+        for token, count in author_count.items():
+            records.append((a, token, count))
+
+    return pd.DataFrame.from_records(records, columns = ['author','token','count'])
+
 
 def get_author_label(doc_id):
-    """ Return the author from the RussianNovels corpus file name.
+    '''Return the author from the RussianNovels corpus file name.
     Placeholder until better metadata handling can be put in place.
-    """
+    '''
     return doc_id.split('_')[0]
 
 class DocumentSplitter(abc.ABC):
