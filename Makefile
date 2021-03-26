@@ -12,7 +12,7 @@ CORPUS_TARGET := russian_novels
 #CORPUS_TARGET := libru_russian
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
-STEM_METHOD := pymystem3
+STEM_METHOD := truncate
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
@@ -128,4 +128,4 @@ clean_experiments:
 .PHONY: clean experiment corpus clean_experiments stemmed_corpus stemmed_experiment
 
 # Don't ever clean up .tsv or .mallet files
-.PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX)
+.PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX) %_vocab.txt
