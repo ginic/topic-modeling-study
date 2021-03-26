@@ -79,8 +79,9 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	python topic_modeling/stemming.py $< $(STEM_CORPUS)/$(STEM_CORPUS).tsv $(STEM_CORPUS)/$(STEM_CORPUS)_lemma_counts.tsv --lemmatizer $(STEM_METHOD) > $(STEM_CORPUS)/stemming.out
 
 # Build a topic model and save topic state from the pruned corpus
+# Also produces authorless topic models output for the experiment
 # These are probably fragile, don't use with parallel make
-%_$(TOPIC_EXPERIMENT_ID): %_pruned.mallet
+%_$(TOPIC_EXPERIMENT_ID): %_pruned.mallet %_pruned_vocab.txt %.tsv
 	mkdir -p $@
 	$(eval file_base := $(addsuffix /$(notdir $@),$@))
 	$(eval state := $(addsuffix .gz,$(file_base)))
@@ -89,10 +90,12 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	$(eval topic_keys := $(addsuffix _topic_keys.txt,$(file_base)))
 	$(eval top_docs := $(addsuffix _top_docs.txt, $(file_base)))
 	$(eval diagnostics := $(addsuffix _diagnostics.xml,$(file_base)))
+	$(eval author_corrs := $(addsuffix _author_correlation.tsv, $(file_base)))
 	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics)
+	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $*.tsv --vocab $*_pruned_vocab.txt --input-state $(state) --output $(author_corrs)
 
 # Force all topic modeling files to depend on the output state file
-%.gz %.model %_doc_topics.txt %_topic_keys.txt : %
+%.gz %.model %_doc_topics.txt %_topic_keys.txt %_author_correlation.tsv: %
 	@test ! -f $@ || touch $@
 	@test -f $@ || rm -f $<
 	@test -f $@ || $(MAKE) $(AM_MAKEFLAGS) $<
