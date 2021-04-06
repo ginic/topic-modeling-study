@@ -12,7 +12,7 @@ CORPUS_TARGET := russian_novels
 #CORPUS_TARGET := libru_russian
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
-STEM_METHOD := snowball
+STEM_METHOD := stanza
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
@@ -50,6 +50,8 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 	cut -f2 $@ | sort | uniq | wc -l
 	@echo "Novel ids in output:"
 	cut -f1,2 -d_ $@ | sort | uniq | wc -l
+	echo "Total docs:" >> $*_corpus_stats.txt
+	wc -l $@ >> $*_corpus_stats.txt
 
 
 # Import TSV data to Mallet format
@@ -64,10 +66,14 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 # Print out corpus term frequency and document frequency stats
 %_$(FEATURE_SUFFIX): %.mallet
 	mallet info --input $< --print-feature-counts | sort --key=3 --reverse --numeric > $@
+	echo "Total tokens $@:" >> $*_corpus_stats.txt
+	cut -f2 $@ | awk '{s+=$$0} END {print s}' >> $*_corpus_stats.txt
 
 # Just authorless-tms/get_vocab.sh: Get vocabulary sorted alphabetically (no counts)
 %_vocab.txt: %.mallet
 	mallet info --input $< --print-feature-counts | cut -f 1 | sort -k 1 > $@
+	echo "Vocab size $@:" >> $*_corpus_stats.txt
+	wc -l $@ >> $*_corpus_stats.txt
 
 # Build list of stop words by comparing the pruned and original vocabs
 %_stopped.txt: %_vocab.txt %_pruned_vocab.txt
@@ -76,7 +82,10 @@ TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
 # Build a stemmed version of the Mallet corpus
 $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	mkdir -p $(STEM_CORPUS)
-	python topic_modeling/stemming.py $< $(STEM_CORPUS)/$(STEM_CORPUS).tsv $(STEM_CORPUS)/$(STEM_CORPUS)_lemma_counts.tsv --lemmatizer $(STEM_METHOD) > $(STEM_CORPUS)/stemming.out
+	python topic_modeling/stemming.py $< $@ $(STEM_CORPUS)/$(STEM_CORPUS)_lemma_counts.tsv --lemmatizer $(STEM_METHOD) > $(STEM_CORPUS)/stemming.out
+	echo "Total stemmed docs:" >> $(STEM_CORPUS)/$(STEM_CORPUS)_corpus_stats.txt
+	wc -l $@ >> $(STEM_CORPUS)/$(STEM_CORPUS)_corpus_stats.txt
+
 
 # Build a topic model and save topic state from the pruned corpus
 # Also produces authorless topic models output for the experiment
