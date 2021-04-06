@@ -53,7 +53,21 @@ def get_num_tokens(text):
     return len(TOKENIZER.tokenize(text))
 
 def get_retokenized(text):
+    """Returns the text tokenized, then joined on whitespace
+    """
     return " ".join(TOKENIZER.tokenize(text))
+
+def get_character_token_ratio(term_freq_df, token_col, term_freq_col):
+    """Returns the overall character to token ratio for given a dataframe of tokens with their term frequencies
+
+    :param term_freq_df: pandas DataFrame with a column for each token and its term count in the corpus
+    :param token_col: str, name of col containing raw tokens
+    :param term_freq_col: str, name of col containing term frequencies
+    """
+    char_lengths = term_freq_df[token_col].apply(lambda w: len(w))
+    avg_numerator = (char_lengths * term_freq_df[term_freq_col]).sum()
+    return avg_numerator/term_freq_df[term_freq_col].sum()
+
 
 
 ##############################################################################

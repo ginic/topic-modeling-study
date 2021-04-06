@@ -15,7 +15,13 @@ def diagnostics_xml_to_dataframe(xml_path):
     model_root = ET.parse(xml_path).getroot()
     topic_metrics = list()
     for t in model_root.findall(TOPIC):
-        topic_metrics.append(t.attrib)
+        attributes = {}
+        for k,v in t.items():
+            if k == TOPIC_ID:
+                attributes[k] = int(v)
+            else:
+                attributes[k] = float(v)
+        topic_metrics.append(attributes)
 
-    return pd.Dataframe.from_records(topic_metrics, index=TOPIC_ID)
+    return pd.DataFrame.from_records(topic_metrics, index=TOPIC_ID)
 
