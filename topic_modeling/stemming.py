@@ -201,16 +201,18 @@ class Pymystem3Lemmatizer:
         :param word: str, single word to get lemma for
         '''
         analysis = self.mystem.analyze(word)
-        # Pymystem always ends its analysis with a new line character, so result will be at least 2 elements, but
-        # if the vocab item is returned as >2, what should be done?
-        if len(analysis) > 2:
-            raise ValueError(f"Pymystem3 lemmatized word '{word}' as multiple elements: {analysis}")
-        a = analysis[0]
         result = ''
-        if PYMYSTEM_ANALYSIS in a and len(a[PYMYSTEM_ANALYSIS]) > 0:
-            # Keep the highest scoring result
-            lexes = a[PYMYSTEM_ANALYSIS]
-            result = lexes[0][PYMYSTEM_LEX].strip()
+        # Pymystem always ends its analysis with a new line character,
+        # so result will be at least 2 elements. Some words, particularly
+        # those with hyphens might be split up into multiple lemmas,
+        # but we want to join them and return a single string
+        for a in analysis[:-1]:
+            if PYMYSTEM_ANALYSIS in a and len(a[PYMYSTEM_ANALYSIS]) > 0:
+                # Keep the highest scoring result
+                lexes = a[PYMYSTEM_ANALYSIS]
+                result += lexes[0][PYMYSTEM_LEX].strip()
+            else:
+                result += a[PYMYSTEM_TEXT].strip()
 
         # Catch things that pymystem doesn't analyze well
         if result == '':
