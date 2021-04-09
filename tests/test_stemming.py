@@ -37,6 +37,7 @@ def helper_test_lemmatizer(lemmatizer):
     '''
     lemma_pairs = lemmatizer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
     assert len(lemma_pairs) == len(EXPECTED_LEMMAS)
+    assert lemmatizer.single_term_lemma('руке') == 'рука'
 
     # Check correct lemmas
     expected_copy = copy.deepcopy(EXPECTED_LEMMAS)
@@ -70,6 +71,8 @@ def test_snowball():
         ('нес', 'нес'), ('в', 'в'), ('руке', 'рук')]
     assert expected == stemmer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
 
+    assert stemmer.single_term_lemma('руке') == 'рук'
+
 
 def test_pymystem3():
     '''Test Pymystem3Lemmatizer'''
@@ -99,6 +102,8 @@ def test_truncation():
         ('шляпу', 'шляпу'), ('пирожком', 'пирожк'), ('нес', 'нес'), ('в', 'в'),
         ('руке', 'руке')])
     assert expected == lemmatizer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
+    assert lemmatizer.single_term_lemma('руке') == 'руке'
+
 
 
 def test_stem_counter_update():

@@ -104,6 +104,17 @@ class StanzaLemmatizer:
                     result.append(NormalizedToken(word.text, word.lemma))
         return result
 
+    def single_term_lemma(self, word):
+        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        '''
+        doc = self.pipeline(word)
+        for sent in doc.sentences:
+            for word in sent.words:
+                return word.lemma
+
+
 
 class SnowballStemmer:
     '''Wrapper around NLTK's implementation of the Snowball Stemmer,
@@ -135,6 +146,13 @@ class SnowballStemmer:
             if not s.isspace() and s!='':
                 result.append(NormalizedToken(t,s))
         return result
+
+    def single_term_lemma(self, word):
+        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        '''
+        return self.stemmer.stem(word)
 
 
 class Pymystem3Lemmatizer:
@@ -177,6 +195,29 @@ class Pymystem3Lemmatizer:
                     result.append(NormalizedToken(token, token))
         return result
 
+    def single_term_lemma(self, word):
+        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases. The `keep_unanalyzed' flag is ignored for this method.
+
+        :param word: str, single word to get lemma for
+        '''
+        analysis = self.mystem.analyze(word)
+        # Pymystem always ends its analysis with a new line character, so result will be at least 2 elements, but
+        # if the vocab item is returned as >2, what should be done?
+        if len(analysis) > 2:
+            raise ValueError(f"Pymystem3 lemmatized word '{word}' as multiple elements: {analysis}")
+        a = analysis[0]
+        result = ''
+        if PYMYSTEM_ANALYSIS in a and len(a[PYMYSTEM_ANALYSIS]) > 0:
+            # Keep the highest scoring result
+            lexes = a[PYMYSTEM_ANALYSIS]
+            result = lexes[0][PYMYSTEM_LEX].strip()
+
+        # Catch things that pymystem doesn't analyze well
+        if result == '':
+            return word
+
+        return result
+
 
 class Pymorphy2Lemmatizer:
     '''Wrapper around Pymorphy2Lemmatizer. Default tokenizer
@@ -208,6 +249,13 @@ class Pymorphy2Lemmatizer:
 
         return result
 
+    def single_term_lemma(self, word):
+        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        '''
+        return self.analyzer.parse(word)[0].normal_form
+
 
 class TruncationStemmer:
     '''A naive strategy to stem by keeping the first num_chars number of
@@ -233,6 +281,13 @@ class TruncationStemmer:
         '''
         tokens = self.tokenizer.tokenize(text)
         return [NormalizedToken(t, t[:self.num_chars]) for t in tokens]
+
+    def single_term_lemma(self, word):
+        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        '''
+        return word[:self.num_chars]
 
 
 def pick_lemmatizer(choice):

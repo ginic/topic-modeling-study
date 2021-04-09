@@ -9,14 +9,13 @@ TXT_CORPUS := ~/workspace/RussianNovels/corpus
 
 # Dir name for corpus & Mallet output
 CORPUS_TARGET := russian_novels
-#CORPUS_TARGET := libru_russian
+#CORPUS_TARGET := toy_example
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
 STEM_METHOD := stanza
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
-# TODO: Target to output correlations files
 AUTHORLESS_TMS := ~/workspace/authorless-tms
 
 # Mallet corpus feature settings for info & pruning
