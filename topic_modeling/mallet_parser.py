@@ -1,6 +1,7 @@
 """Functions for dealing with Mallet's diagnostics and state files
 """
 import argparse
+from collections import Counter
 import xml.etree.ElementTree as ET
 import gzip
 
@@ -52,17 +53,19 @@ def get_stemmed_vocab(vocab_file, stemmer):
     return vocab, vocab_index
 
 
-def stem_state_file(in_state_file, out_state_file, vocab_index, stemmer):
+def stem_state_file(in_state_file, out_state_file, stemmer):
     """Creates a new Mallet .gzip state file by post processing vocab elements with stemming.
 
     :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
     :param out_state_file: Target path for new .gzip file
     :param vocab_index: map of stemmed vocab item to int index
     :param stemmer: a Stemmer object from topic_modeling.stemming
+    :returns: Map of topic id to a Counter with stemmed terms as keys and counts
+        of the stem for that topic
     """
     # TODO Some clean up needed here
     # TODO What do we want to do with topic/term counts?
-    n_vocab = len(vocab_index)
+    vocab_index = {}
     gzip_reader = gzip.open(in_state_file, mode='rt', encoding='utf-8')
     gzip_writer = gzip.open(out_state_file, mode='wt', encoding='utf-8')
     header = gzip_reader.readline()
@@ -74,7 +77,7 @@ def stem_state_file(in_state_file, out_state_file, vocab_index, stemmer):
     beta_text = gzip_reader.readline()
     gzip_writer.write(beta_text)
 
-    topic_term_counts = np.zeros((n_topics, n_vocab))
+    topic_term_counts = {i:Counter() for i in range(n_topics)}
 
     current_doc_id = -1
     for i, line in enumerate(gzip_reader):
@@ -89,12 +92,16 @@ def stem_state_file(in_state_file, out_state_file, vocab_index, stemmer):
                 print("Reading terms for doc:", doc_id)
                 current_doc_id = doc_id
         stemmed_term = stemmer.single_term_lemma(term)
-        stemmed_term_index = vocab_index[stemmed_term]
+        if stemmed_term != '' and stemmed_term not in vocab_index:
+            stemmed_term_index = len(vocab_index)
+            vocab_index[stemmed_term_index] = stemmed_term_index
+        else:
+            stemmed_term_index = vocab_index[stemmed_term]
 
         output_result = " ".join([str(doc_id), source, pos, str(stemmed_term_index), stemmed_term, str(topic)])
         gzip_writer.write(output_result + "\n")
 
-        topic_term_counts[topic, stemmed_term_index] += 1
+        topic_term_counts[topic][stemmed_term_index] += 1
 
     gzip_writer.close()
     gzip_reader.close()
@@ -115,7 +122,6 @@ diagnostics_parser.add_argument('out_tsv', help="Target path for diagnostics in 
 
 state_file_parser = subparsers.add_parser('state-file', help="Work with state files")
 state_file_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
-state_file_parser.add_argument('input_vocab', help="Text file, vocabulary corresponding to the state file, one term per line.")
 state_file_parser.add_argument('out_gz', help="Desired path for new gzip to be created")
 state_file_parser.add_argument('--lemmatizer', '-l',
     help='Choice of stemmer/lemmatizer',
@@ -127,11 +133,8 @@ if __name__ == "__main__":
     subparser_name = args.subparser_name
     if subparser_name=="state-file":
         stemmer = stemming.pick_lemmatizer(args.lemmatizer)
-        stemmed_vocab, stemmed_idx = get_stemmed_vocab(args.input_vocab, stemmer)
-        print("Stemmed vocab and index produced. Number of stemmed vocab items:", len(stemmed_vocab))
-        # TODO write out new vocab file
         print("Producing stemmed version of", args.in_gz, "to be written to", args.out_gz)
-        topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmed_idx, stemmer)
+        topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer)
     else:
         diagnostics_df = diagnostics_xml_to_dataframe(args.in_xml)
         # Make sure pandas will print everything
