@@ -35,6 +35,9 @@ def diagnostics_xml_to_dataframe(xml_path):
 
     return pd.DataFrame.from_records(topic_metrics, index=TOPIC_ID)
 
+def write_header_to_morph_analysis_file(filepath, col_name):
+    with open(filepath, 'w') as f:
+        f.write(f"topic\t{col_name}\tcount\tproportion\n")
 
 def get_stemmed_vocab(vocab_file, stemmer):
     '''Read in the vocabulary from a txt file, one element per line.
@@ -58,11 +61,31 @@ def entropy(probabilities):
     """
     return -np.sum(probabilities * np.log2(probabilities))
 
-def morphological_entropy_single_topic(mystem, topic_term_counts):
+def append_topic_morphological_analysis_to_file(topic_id, tsv_file, weighted_morph_analysis_counts, total_counts):
+    """Writes out morphological analysis of a topic to tsv file in order of descending proportion
+    """
+    results = []
+    for k,v in weighted_morph_analysis_counts.items():
+        proportion = v / total_counts
+        results.append([topic_id, k, v, proportion])
+
+    sorted_results = sorted(results, key=lambda x: x[3], reverse=True)
+
+    with open(tsv_file, 'a') as f:
+        for l in sorted_results:
+            f.write("\t".join([str(x) for x in l]) + "\n")
+
+
+def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None, stem_file=None, lemma_file=None, pos_file=None):
     """For a given topic, returns the slot entropy, number of slots, part of speech entropy, number of part of speech tags, lemma entropy, number of lemmas.
+    If an outputdir is specified, the pos tags, slots and lemmas will be written
 
     :param mystem: Pymystem3 instance for determining mrophological analysis
     :param topic_term_counts: {term: count} mapping for a single topic
+    :param topic_id: Id of topic, only needed if you're going to write detailed results to a file
+    :param stem_file: file to write detailed stem analysis to
+    :param lemma_file: file to write detailed lemma analysis to
+    :param pos_file: file to write detailed pos analysis to
     """
     weighted_slot_counts = defaultdict(float)
     weighted_lemma_counts = defaultdict(float)
@@ -82,8 +105,15 @@ def morphological_entropy_single_topic(mystem, topic_term_counts):
                 weighted_lemma_counts[lemma] += weight*count
                 weighted_pos_counts[pos] += weight*count
 
-
     joint_topic_count = sum(topic_term_counts.values())
+
+    if topic_id:
+        if stem_file:
+            append_topic_morphological_analysis_to_file(topic_id, stem_file, weighted_slot_counts, joint_topic_count)
+        if lemma_file:
+            append_topic_morphological_analysis_to_file(topic_id, lemma_file, weighted_lemma_counts, joint_topic_count)
+        if pos_file:
+            append_topic_morphological_analysis_to_file(topic_id, pos_file, weighted_pos_counts, joint_topic_count)
 
     slot_probs = np.array(list(weighted_slot_counts.values())) / joint_topic_count
     pos_probs = np.array(list(weighted_pos_counts.values())) / joint_topic_count
@@ -96,14 +126,16 @@ def morphological_entropy_single_topic(mystem, topic_term_counts):
     return slot_entropy, len(weighted_slot_counts), pos_entropy, len(weighted_pos_counts), lemma_entropy, len(weighted_lemma_counts)
 
 
-def morphological_entropy_all_topics(in_state_file):
-    """Returns 'slot entropy' metric for each topic
-
-    ..TODO Also needs to handle (lemma, surface_from) pair counts
+def morphological_entropy_all_topics(in_state_file, stem_analysis_file=None, lemma_analysis_file=None, pos_analysis_file=None):
+    """Computes entropy by various levels of morphological analysis
 
     :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
     :returns: pandas DataFrame
     """
+    # prep detailed analysis files
+    for (f, col) in [(stem_analysis_file, "stem"), (lemma_analysis_file, "lemma"), (pos_analysis_file, "pos")]:
+        if f:
+            write_header_to_morph_analysis_file(f, col)
 
     gzip_reader = gzip.open(in_state_file, mode='rt', encoding='utf-8')
 
@@ -138,7 +170,8 @@ def morphological_entropy_all_topics(in_state_file):
     for topic_id in topic_term_counts:
         if topic_id % 10 == 0:
             print("Calculating entropies for topic:", topic_id)
-        slot_entropy, num_slots, pos_entropy, num_pos, lemma_entropy, num_lemmas = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id])
+
+        slot_entropy, num_slots, pos_entropy, num_pos, lemma_entropy, num_lemmas = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id], topic_id, stem_analysis_file, lemma_analysis_file, pos_analysis_file)
 
         result.append([topic_id, slot_entropy, num_slots, pos_entropy, num_pos, lemma_entropy, num_lemmas])
 
@@ -221,7 +254,10 @@ state_file_parser.add_argument('--lemmatizer', '-l',
 
 slot_entropy_parser = subparsers.add_parser('slot-entropy', help="Produces 'slot entropy' values for each topic given a Mallet state file")
 slot_entropy_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
-slot_entropy_parser.add_argument('out_tsv', help="Target path for slot entropy metrics in TSV format")
+slot_entropy_parser.add_argument('out_tsv', help="Target path for morphological entropy metrics in TSV format")
+slot_entropy_parser.add_argument("--stem-analysis", "-s", help="Target path for detailed stem metrics by topic")
+slot_entropy_parser.add_argument("--lemma-analysis", "-l", help="Target path for detailed lemma metrics by topic")
+slot_entropy_parser.add_argument("--pos-analysis", "-p", help="Target path for detailed pos metrics by topic")
 
 
 if __name__ == "__main__":
@@ -233,7 +269,7 @@ if __name__ == "__main__":
         topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer)
     elif subparser_name=="slot-entropy":
         print("Determining morphological slot entropy for topics in", args.in_gz)
-        slot_entropy_df = morphological_entropy_all_topics(args.in_gz)
+        slot_entropy_df = morphological_entropy_all_topics(args.in_gz, args.stem_analysis, args.lemma_analysis, args.pos_analysis)
         print("Writing resulting dataframe to", args.out_tsv)
         slot_entropy_df.to_csv(args.out_tsv, sep="\t", index=False)
 
