@@ -1,12 +1,13 @@
 """Functions for dealing with Mallet's diagnostics and state files
 """
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 import xml.etree.ElementTree as ET
 import gzip
 
 import numpy as np
 import pandas as pd
+import pymystem3
 
 from scipy.sparse import lil_matrix
 
@@ -52,6 +53,97 @@ def get_stemmed_vocab(vocab_file, stemmer):
             vocab.append(lemma)
     return vocab, vocab_index
 
+def entropy(probabilities):
+    """Returns the entropy given a list of probabilities for n elements
+    """
+    return -np.sum(probabilities * np.log2(probabilities))
+
+def morphological_entropy_single_topic(mystem, topic_term_counts):
+    """For a given topic, returns the slot entropy, number of slots, part of speech entropy, number of part of speech tags, lemma entropy, number of lemmas.
+
+    :param mystem: Pymystem3 instance for determining mrophological analysis
+    :param topic_term_counts: {term: count} mapping for a single topic
+    """
+    weighted_slot_counts = defaultdict(float)
+    weighted_lemma_counts = defaultdict(float)
+    weighted_pos_counts = defaultdict(float)
+    for surface_form, count in topic_term_counts.items():
+        # We're just going to grab the first analysis element from pymystem3.
+        # This might be wrong in some very small numbers of edge cases where pymystem3
+        # tokenization is different (usually involves hyphens).
+        analysis = mystem.analyze(surface_form)[0]
+        for morph_analysis in analysis['analysis']:
+            slot = morph_analysis['gr']
+            pos = slot.split("=")[0]
+            weight = morph_analysis['wt']
+            lemma = morph_analysis['lex']
+            if weight != 0:
+                weighted_slot_counts[slot] += weight*count
+                weighted_lemma_counts[lemma] += weight*count
+                weighted_pos_counts[pos] += weight*count
+
+
+    joint_topic_count = sum(topic_term_counts.values())
+
+    slot_probs = np.array(list(weighted_slot_counts.values())) / joint_topic_count
+    pos_probs = np.array(list(weighted_pos_counts.values())) / joint_topic_count
+    lemma_probs = np.array(list(weighted_lemma_counts.values())) / joint_topic_count
+
+    slot_entropy = entropy(slot_probs)
+    pos_entropy = entropy(pos_probs)
+    lemma_entropy = entropy(lemma_probs)
+
+    return slot_entropy, len(weighted_slot_counts), pos_entropy, len(weighted_pos_counts), lemma_entropy, len(weighted_lemma_counts)
+
+
+def morphological_entropy_all_topics(in_state_file):
+    """Returns 'slot entropy' metric for each topic
+
+    ..TODO Also needs to handle (lemma, surface_from) pair counts
+
+    :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
+    :returns: pandas DataFrame
+    """
+
+    gzip_reader = gzip.open(in_state_file, mode='rt', encoding='utf-8')
+
+    header = gzip_reader.readline()
+    alpha_text = gzip_reader.readline()
+    alphas = [float(a) for a in alpha_text.strip().split(' : ')[1].split()]
+    n_topics = len(alphas)
+    beta_text = gzip_reader.readline()
+
+    topic_term_counts = {i:Counter() for i in range(n_topics)}
+
+    current_doc_id = -1
+    for i, line in enumerate(gzip_reader):
+        fields = line.strip().split()
+        doc_id = int(fields[0])
+        term = fields[4]
+        topic_id = int(fields[5])
+        if doc_id and doc_id % 1000==0:
+            if doc_id != current_doc_id:
+                print("Reading terms for doc:", doc_id)
+                current_doc_id = doc_id
+
+        topic_term_counts[topic_id][term] += 1
+
+    gzip_reader.close()
+
+    mystem = pymystem3.Mystem(disambiguation=False)
+
+    result = []
+
+    # Determine P(slot|k) for each topic
+    for topic_id in topic_term_counts:
+        if topic_id % 10 == 0:
+            print("Calculating entropies for topic:", topic_id)
+        slot_entropy, num_slots, pos_entropy, num_pos, lemma_entropy, num_lemmas = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id])
+
+        result.append([topic_id, slot_entropy, num_slots, pos_entropy, num_pos, lemma_entropy, num_lemmas])
+
+    return pd.DataFrame.from_records(result, columns=['topic_id', 'slot_entropy', 'num_slots', 'pos_entropy', 'num_pos', 'lemma_entropy', 'num_lemmas'])
+
 
 def stem_state_file(in_state_file, out_state_file, stemmer):
     """Creates a new Mallet .gzip state file by post processing vocab elements with stemming.
@@ -94,7 +186,7 @@ def stem_state_file(in_state_file, out_state_file, stemmer):
         stemmed_term = stemmer.single_term_lemma(term)
         if stemmed_term != '' and stemmed_term not in vocab_index:
             stemmed_term_index = len(vocab_index)
-            vocab_index[stemmed_term_index] = stemmed_term_index
+            vocab_index[stemmed_term] = stemmed_term_index
         else:
             stemmed_term_index = vocab_index[stemmed_term]
 
@@ -127,6 +219,10 @@ state_file_parser.add_argument('--lemmatizer', '-l',
     help='Choice of stemmer/lemmatizer',
     choices=stemming.STEMMER_CHOICES)
 
+slot_entropy_parser = subparsers.add_parser('slot-entropy', help="Produces 'slot entropy' values for each topic given a Mallet state file")
+slot_entropy_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
+slot_entropy_parser.add_argument('out_tsv', help="Target path for slot entropy metrics in TSV format")
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -135,6 +231,12 @@ if __name__ == "__main__":
         stemmer = stemming.pick_lemmatizer(args.lemmatizer)
         print("Producing stemmed version of", args.in_gz, "to be written to", args.out_gz)
         topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer)
+    elif subparser_name=="slot-entropy":
+        print("Determining morphological slot entropy for topics in", args.in_gz)
+        slot_entropy_df = morphological_entropy_all_topics(args.in_gz)
+        print("Writing resulting dataframe to", args.out_tsv)
+        slot_entropy_df.to_csv(args.out_tsv, sep="\t", index=False)
+
     else:
         diagnostics_df = diagnostics_xml_to_dataframe(args.in_xml)
         # Make sure pandas will print everything
