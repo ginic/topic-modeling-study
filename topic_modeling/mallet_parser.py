@@ -77,7 +77,7 @@ def append_topic_morphological_analysis_to_file(topic_id, tsv_file, weighted_mor
     results = []
     for k,v in weighted_morph_analysis_counts.items():
         weighted_proportion = v / total_counts
-        unweighted_count = unweighted_proportion[k]
+        unweighted_count = unweighted_morph_analysis_counts[k]
         unweighted_proportion =  unweighted_count / total_counts
         results.append([topic_id, k, v, unweighted_count, weighted_proportion])
 
@@ -88,29 +88,33 @@ def append_topic_morphological_analysis_to_file(topic_id, tsv_file, weighted_mor
             f.write("\t".join([str(x) for x in l]) + "\n")
 
 
-def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None, stem_file=None, lemma_file=None, pos_file=None, top_n=DEFAULT_TOP_N):
+def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None, slot_file=None, lemma_file=None, pos_file=None, top_n=DEFAULT_TOP_N):
     """For a given topic, returns the slot entropy, number of slots, part of speech entropy, number of part of speech tags, lemma entropy, number of lemmas.
     If an outputdir is specified, the pos tags, slots and lemmas will be written
 
     :param mystem: Pymystem3 instance for determining mrophological analysis
     :param topic_term_counts: Counter {term: count} mapping for a single topic
     :param topic_id: int id of topic, only needed if you're going to write detailed results to a file
-    :param stem_file: file to write detailed stem analysis to
+    :param slot_file: file to write detailed slot analysis to
     :param lemma_file: file to write detailed lemma analysis to
     :param pos_file: file to write detailed pos analysis to
     :param top_n_terms: int, the number of terms to consider for building ratios based on top n word forms in topic
     """
-    # TODO This code is so cludgey, really needs to be reorged into an object
+    # TODO This code is so cludgey, really needs to be reorged
     weighted_slot_counts = defaultdict(float)
     weighted_lemma_counts = defaultdict(float)
     weighted_pos_counts = defaultdict(float)
-    unweighted_slot_counts = defaultdict(int)
-    unweighted_lemma_counts = defaultdict(int)
-    unweighted_pos_counts = defaultdict(int)
-    lemmas_in_top_n_terms = defaultdict(int)
+    unweighted_slot_counts = defaultdict(float)
+    unweighted_lemma_counts = defaultdict(float)
+    unweighted_pos_counts = defaultdict(float)
+    lemmas_in_top_n_terms = defaultdict(float)
+    slots_in_top_n_terms = defaultdict(float)
+    pos_in_top_n_terms = defaultdict(float)
 
     top_n_counter = 0
     for surface_form, count in topic_term_counts.most_common():
+        if count==0:
+            print("0 flag:", surface_form)
         # We're just going to grab the first analysis element from pymystem3.
         # This might be wrong in some very small numbers of edge cases where pymystem3
         # tokenization is different (usually involves hyphens).
@@ -124,10 +128,13 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
             lemma = morph_analysis['lex']
             # For unweighted, just take the first result
             if i==0:
-                unweighted_slot_counts[slot] += 1
-                unweighted_lemma_counts[lemma] += 1
-                unweighted_pos_counts[pos] += 1
-                lemmas_in_top_n_terms[lemma] += count
+                unweighted_slot_counts[slot] += count
+                unweighted_lemma_counts[lemma] += count
+                unweighted_pos_counts[pos] += count
+                if top_n_counter < top_n:
+                    lemmas_in_top_n_terms[lemma] += count
+                    slots_in_top_n_terms[slot] += count
+                    pos_in_top_n_terms[pos] += count
 
             if weight != 0:
                 weighted_slot_counts[slot] += weight*count
@@ -137,14 +144,6 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
         top_n_counter += 1
 
     joint_topic_count = sum(topic_term_counts.values())
-
-    if topic_id:
-        if stem_file:
-            append_topic_morphological_analysis_to_file(topic_id, stem_file, weighted_slot_counts, unweighted_slot_counts, joint_topic_count)
-        if lemma_file:
-            append_topic_morphological_analysis_to_file(topic_id, lemma_file, weighted_lemma_counts, unweighted_lemma_counts, joint_topic_count)
-        if pos_file:
-            append_topic_morphological_analysis_to_file(topic_id, pos_file, weighted_pos_counts, unweighted_pos_counts, joint_topic_count)
 
     # Calculates all metrics we want to write to file
     weighted_slot_entropy = get_entropy_from_counts_dict(weighted_slot_counts, joint_topic_count)
@@ -159,23 +158,35 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
     unweighted_ratio_slots_lemmas = len(unweighted_slot_counts) / len(unweighted_lemma_counts)
     unweighted_ratio_pos_lemmas = len(unweighted_pos_counts) / len(unweighted_lemma_counts)
     lemmas_to_forms_top_n = len(lemmas_in_top_n_terms) / top_n
+    slots_to_forms_top_n = len(slots_in_top_n_terms) / top_n
+    pos_to_forms_top_n = len(pos_in_top_n_terms) / top_n
     top_n_coverage = sum(lemmas_in_top_n_terms.values()) / joint_topic_count
 
-    return weighted_slot_entropy, len(weighted_slot_counts), weighted_pos_entropy, len(weighted_pos_counts), weighted_lemma_entropy, len(weighted_lemma_counts), unweighted_slot_entropy, len(unweighted_slot_counts), unweighted_pos_entropy, len(unweighted_pos_counts), unweighted_lemma_entropy, len(unweighted_lemma_counts), weighted_ratio_slots_lemmas, weighted_ratio_pos_lemmas, unweighted_ratio_slots_lemmas, unweighted_ratio_pos_lemmas, lemmas_to_forms_top_n, top_n_coverage
+    # Write to file if desired
+    if topic_id:
+        if slot_file:
+            append_topic_morphological_analysis_to_file(topic_id, slot_file, weighted_slot_counts, unweighted_slot_counts, joint_topic_count)
+        if lemma_file:
+            append_topic_morphological_analysis_to_file(topic_id, lemma_file, weighted_lemma_counts, unweighted_lemma_counts, joint_topic_count)
+        if pos_file:
+            append_topic_morphological_analysis_to_file(topic_id, pos_file, weighted_pos_counts, unweighted_pos_counts, joint_topic_count)
 
 
-def morphological_entropy_all_topics(in_state_file, stem_analysis_file=None, lemma_analysis_file=None, pos_analysis_file=None, top_n=DEFAULT_TOP_N):
+    return weighted_slot_entropy, len(weighted_slot_counts), weighted_pos_entropy, len(weighted_pos_counts), weighted_lemma_entropy, len(weighted_lemma_counts), unweighted_slot_entropy, len(unweighted_slot_counts), unweighted_pos_entropy, len(unweighted_pos_counts), unweighted_lemma_entropy, len(unweighted_lemma_counts), weighted_ratio_slots_lemmas, weighted_ratio_pos_lemmas, unweighted_ratio_slots_lemmas, unweighted_ratio_pos_lemmas, lemmas_to_forms_top_n, slots_to_forms_top_n, pos_to_forms_top_n,  top_n_coverage
+
+
+def morphological_entropy_all_topics(in_state_file, slot_analysis_file=None, lemma_analysis_file=None, pos_analysis_file=None, top_n=DEFAULT_TOP_N):
     """Computes entropy by various levels of morphological analysis
 
     :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
-    :param stem_analysis_file: optional file to write detailed stem metrics to
+    :param slot_analysis_file: optional file to write detailed slot metrics to
     :param lemma_analysis_file: optional file to write detailed lemma metrics to
     :param pos_analysis_file: optional file to write detailed pos metrics to
     :param top_n: number of top terms of each topic to consider for metrics that use it
     :returns: pandas DataFrame
     """
     # prep detailed analysis files
-    for (f, col) in [(stem_analysis_file, "stem"), (lemma_analysis_file, "lemma"), (pos_analysis_file, "pos")]:
+    for (f, col) in [(slot_analysis_file, "slot"), (lemma_analysis_file, "lemma"), (pos_analysis_file, "pos")]:
         if f:
             write_header_to_morph_analysis_file(f, col)
 
@@ -215,11 +226,12 @@ def morphological_entropy_all_topics(in_state_file, stem_analysis_file=None, lem
         if topic_id % 10 == 0:
             print("Calculating entropies for topic:", topic_id)
 
-        results_tuple = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id], topic_id, stem_analysis_file, lemma_analysis_file, pos_analysis_file)
+        results_tuple = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id], topic_id, slot_analysis_file, lemma_analysis_file, pos_analysis_file)
+        tmp_list = [topic_id]
+        tmp_list.extend(results_tuple)
+        result.append(tmp_list)
 
-        result.append([topic_id].extend(results_tuple))
-
-    return pd.DataFrame.from_records(result, columns=['topic_id', 'weighted_slot_entropy', 'num_weighted_slots', 'weighted_pos_entropy', 'num_weighted_pos', 'weighted_lemma_entropy', 'num_weighted_lemmas', 'unweighted_slot_entropy', 'num_unweighted_slots', 'unweighted_pos_entropy', 'num_unweighted_pos', 'uweighted_lemma_entropy', 'num_unweighted_lemmas', 'weighted_ratio_slots_to_lemmas', 'weighted_ratio_pos_to_lemmas','unweighted_ratio_slots_to_lemmas', 'unweighted_ratio_pos_to_lemmas', f'lemmas_to_{top_n}_surface_forms', f'topic_coverage_by_top_{top_n}_surface_forms'])
+    return pd.DataFrame.from_records(result, columns=['topic_id', 'weighted_slot_entropy', 'num_weighted_slots', 'weighted_pos_entropy', 'num_weighted_pos', 'weighted_lemma_entropy', 'num_weighted_lemmas', 'unweighted_slot_entropy', 'num_unweighted_slots', 'unweighted_pos_entropy', 'num_unweighted_pos', 'uweighted_lemma_entropy', 'num_unweighted_lemmas', 'weighted_ratio_slots_to_lemmas', 'weighted_ratio_pos_to_lemmas','unweighted_ratio_slots_to_lemmas', 'unweighted_ratio_pos_to_lemmas', f'lemmas_to_{top_n}_surface_forms', f'slots_to_{top_n}_surface_forms', f'pos_to_{top_n}_surface_forms', f'topic_coverage_by_top_{top_n}_surface_forms'])
 
 
 def stem_state_file(in_state_file, out_state_file, stemmer):
@@ -299,7 +311,7 @@ state_file_parser.add_argument('--lemmatizer', '-l',
 slot_entropy_parser = subparsers.add_parser('slot-entropy', help="Produces 'slot entropy' values for each topic given a Mallet state file")
 slot_entropy_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
 slot_entropy_parser.add_argument('out_tsv', help="Target path for morphological entropy metrics in TSV format")
-slot_entropy_parser.add_argument("--stem-analysis", "-s", help="Target path for detailed stem metrics by topic")
+slot_entropy_parser.add_argument("--slot-analysis", "-s", help="Target path for detailed slot metrics by topic")
 slot_entropy_parser.add_argument("--lemma-analysis", "-l", help="Target path for detailed lemma metrics by topic")
 slot_entropy_parser.add_argument("--pos-analysis", "-p", help="Target path for detailed pos metrics by topic")
 
@@ -313,7 +325,7 @@ if __name__ == "__main__":
         topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer)
     elif subparser_name=="slot-entropy":
         print("Determining morphological slot entropy for topics in", args.in_gz)
-        slot_entropy_df = morphological_entropy_all_topics(args.in_gz, args.stem_analysis, args.lemma_analysis, args.pos_analysis)
+        slot_entropy_df = morphological_entropy_all_topics(args.in_gz, args.slot_analysis, args.lemma_analysis, args.pos_analysis)
         print("Writing resulting dataframe to", args.out_tsv)
         slot_entropy_df.to_csv(args.out_tsv, sep="\t", index=False)
 
