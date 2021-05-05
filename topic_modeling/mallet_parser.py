@@ -16,6 +16,7 @@ import topic_modeling.stemming as stemming
 # Diagnostics XML constants
 TOPIC="topic"
 TOPIC_ID="id"
+DEFAULT_TOP_N=20
 
 
 def diagnostics_xml_to_dataframe(xml_path):
@@ -37,7 +38,7 @@ def diagnostics_xml_to_dataframe(xml_path):
 
 def write_header_to_morph_analysis_file(filepath, col_name):
     with open(filepath, 'w') as f:
-        f.write(f"topic\t{col_name}\tcount\tproportion\n")
+        f.write(f"topic\t{col_name}\tweighted_count\tweighted_proportion\nunweighted_count\tunweighted_proportion")
 
 def get_stemmed_vocab(vocab_file, stemmer):
     '''Read in the vocabulary from a txt file, one element per line.
@@ -61,13 +62,24 @@ def entropy(probabilities):
     """
     return -np.sum(probabilities * np.log2(probabilities))
 
-def append_topic_morphological_analysis_to_file(topic_id, tsv_file, weighted_morph_analysis_counts, total_counts):
+def get_entropy_from_counts_dict(topic_counts_dict, total_term_count):
+    """Calculates probabilities and entropy from a dict of counts for a term/lemma/pos/slot
+
+    :param counts_dict: dict, str to float or int
+    :param total_term_count: int, number of terms in topic overall (note, could also be retrieved from sum of in dict)
+    """
+    probs = np.array(list(topic_counts_dict.values())) / total_term_count
+    return entropy(probs)
+
+def append_topic_morphological_analysis_to_file(topic_id, tsv_file, weighted_morph_analysis_counts, unweighted_morph_analysis_counts, total_counts):
     """Writes out morphological analysis of a topic to tsv file in order of descending proportion
     """
     results = []
     for k,v in weighted_morph_analysis_counts.items():
-        proportion = v / total_counts
-        results.append([topic_id, k, v, proportion])
+        weighted_proportion = v / total_counts
+        unweighted_count = unweighted_proportion[k]
+        unweighted_proportion =  unweighted_count / total_counts
+        results.append([topic_id, k, v, unweighted_count, weighted_proportion])
 
     sorted_results = sorted(results, key=lambda x: x[3], reverse=True)
 
@@ -76,60 +88,90 @@ def append_topic_morphological_analysis_to_file(topic_id, tsv_file, weighted_mor
             f.write("\t".join([str(x) for x in l]) + "\n")
 
 
-def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None, stem_file=None, lemma_file=None, pos_file=None):
+def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None, stem_file=None, lemma_file=None, pos_file=None, top_n=DEFAULT_TOP_N):
     """For a given topic, returns the slot entropy, number of slots, part of speech entropy, number of part of speech tags, lemma entropy, number of lemmas.
     If an outputdir is specified, the pos tags, slots and lemmas will be written
 
     :param mystem: Pymystem3 instance for determining mrophological analysis
-    :param topic_term_counts: {term: count} mapping for a single topic
-    :param topic_id: Id of topic, only needed if you're going to write detailed results to a file
+    :param topic_term_counts: Counter {term: count} mapping for a single topic
+    :param topic_id: int id of topic, only needed if you're going to write detailed results to a file
     :param stem_file: file to write detailed stem analysis to
     :param lemma_file: file to write detailed lemma analysis to
     :param pos_file: file to write detailed pos analysis to
+    :param top_n_terms: int, the number of terms to consider for building ratios based on top n word forms in topic
     """
+    # TODO This code is so cludgey, really needs to be reorged into an object
     weighted_slot_counts = defaultdict(float)
     weighted_lemma_counts = defaultdict(float)
     weighted_pos_counts = defaultdict(float)
-    for surface_form, count in topic_term_counts.items():
+    unweighted_slot_counts = defaultdict(int)
+    unweighted_lemma_counts = defaultdict(int)
+    unweighted_pos_counts = defaultdict(int)
+    lemmas_in_top_n_terms = defaultdict(int)
+
+    top_n_counter = 0
+    for surface_form, count in topic_term_counts.most_common():
         # We're just going to grab the first analysis element from pymystem3.
         # This might be wrong in some very small numbers of edge cases where pymystem3
         # tokenization is different (usually involves hyphens).
         analysis = mystem.analyze(surface_form)[0]
-        for morph_analysis in analysis['analysis']:
+
+        for i in range(len(analysis['analysis'])):
+            morph_analysis = analysis['analysis'][i]
             slot = morph_analysis['gr']
             pos = slot.split("=")[0]
             weight = morph_analysis['wt']
             lemma = morph_analysis['lex']
+            # For unweighted, just take the first result
+            if i==0:
+                unweighted_slot_counts[slot] += 1
+                unweighted_lemma_counts[lemma] += 1
+                unweighted_pos_counts[pos] += 1
+                lemmas_in_top_n_terms[lemma] += count
+
             if weight != 0:
                 weighted_slot_counts[slot] += weight*count
                 weighted_lemma_counts[lemma] += weight*count
                 weighted_pos_counts[pos] += weight*count
 
+        top_n_counter += 1
+
     joint_topic_count = sum(topic_term_counts.values())
 
     if topic_id:
         if stem_file:
-            append_topic_morphological_analysis_to_file(topic_id, stem_file, weighted_slot_counts, joint_topic_count)
+            append_topic_morphological_analysis_to_file(topic_id, stem_file, weighted_slot_counts, unweighted_slot_counts, joint_topic_count)
         if lemma_file:
-            append_topic_morphological_analysis_to_file(topic_id, lemma_file, weighted_lemma_counts, joint_topic_count)
+            append_topic_morphological_analysis_to_file(topic_id, lemma_file, weighted_lemma_counts, unweighted_lemma_counts, joint_topic_count)
         if pos_file:
-            append_topic_morphological_analysis_to_file(topic_id, pos_file, weighted_pos_counts, joint_topic_count)
+            append_topic_morphological_analysis_to_file(topic_id, pos_file, weighted_pos_counts, unweighted_pos_counts, joint_topic_count)
 
-    slot_probs = np.array(list(weighted_slot_counts.values())) / joint_topic_count
-    pos_probs = np.array(list(weighted_pos_counts.values())) / joint_topic_count
-    lemma_probs = np.array(list(weighted_lemma_counts.values())) / joint_topic_count
+    # Calculates all metrics we want to write to file
+    weighted_slot_entropy = get_entropy_from_counts_dict(weighted_slot_counts, joint_topic_count)
+    weighted_pos_entropy = get_entropy_from_counts_dict(weighted_pos_counts, joint_topic_count)
+    weighted_lemma_entropy = get_entropy_from_counts_dict(weighted_lemma_counts, joint_topic_count)
+    unweighted_slot_entropy = get_entropy_from_counts_dict(unweighted_slot_counts, joint_topic_count)
+    unweighted_pos_entropy = get_entropy_from_counts_dict(unweighted_pos_counts, joint_topic_count)
+    unweighted_lemma_entropy = get_entropy_from_counts_dict(unweighted_lemma_counts, joint_topic_count)
 
-    slot_entropy = entropy(slot_probs)
-    pos_entropy = entropy(pos_probs)
-    lemma_entropy = entropy(lemma_probs)
+    weighted_ratio_slots_lemmas = len(weighted_slot_counts) / len(weighted_lemma_counts)
+    weighted_ratio_pos_lemmas = len(weighted_pos_counts) / len(weighted_lemma_counts)
+    unweighted_ratio_slots_lemmas = len(unweighted_slot_counts) / len(unweighted_lemma_counts)
+    unweighted_ratio_pos_lemmas = len(unweighted_pos_counts) / len(unweighted_lemma_counts)
+    lemmas_to_forms_top_n = len(lemmas_in_top_n_terms) / top_n
+    top_n_coverage = sum(lemmas_in_top_n_terms.values()) / joint_topic_count
 
-    return slot_entropy, len(weighted_slot_counts), pos_entropy, len(weighted_pos_counts), lemma_entropy, len(weighted_lemma_counts)
+    return weighted_slot_entropy, len(weighted_slot_counts), weighted_pos_entropy, len(weighted_pos_counts), weighted_lemma_entropy, len(weighted_lemma_counts), unweighted_slot_entropy, len(unweighted_slot_counts), unweighted_pos_entropy, len(unweighted_pos_counts), unweighted_lemma_entropy, len(unweighted_lemma_counts), weighted_ratio_slots_lemmas, weighted_ratio_pos_lemmas, unweighted_ratio_slots_lemmas, unweighted_ratio_pos_lemmas, lemmas_to_forms_top_n, top_n_coverage
 
 
-def morphological_entropy_all_topics(in_state_file, stem_analysis_file=None, lemma_analysis_file=None, pos_analysis_file=None):
+def morphological_entropy_all_topics(in_state_file, stem_analysis_file=None, lemma_analysis_file=None, pos_analysis_file=None, top_n=DEFAULT_TOP_N):
     """Computes entropy by various levels of morphological analysis
 
     :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
+    :param stem_analysis_file: optional file to write detailed stem metrics to
+    :param lemma_analysis_file: optional file to write detailed lemma metrics to
+    :param pos_analysis_file: optional file to write detailed pos metrics to
+    :param top_n: number of top terms of each topic to consider for metrics that use it
     :returns: pandas DataFrame
     """
     # prep detailed analysis files
@@ -139,10 +181,12 @@ def morphological_entropy_all_topics(in_state_file, stem_analysis_file=None, lem
 
     gzip_reader = gzip.open(in_state_file, mode='rt', encoding='utf-8')
 
+    # Burn header
     header = gzip_reader.readline()
     alpha_text = gzip_reader.readline()
     alphas = [float(a) for a in alpha_text.strip().split(' : ')[1].split()]
     n_topics = len(alphas)
+    # Burn beta values
     beta_text = gzip_reader.readline()
 
     topic_term_counts = {i:Counter() for i in range(n_topics)}
@@ -171,11 +215,11 @@ def morphological_entropy_all_topics(in_state_file, stem_analysis_file=None, lem
         if topic_id % 10 == 0:
             print("Calculating entropies for topic:", topic_id)
 
-        slot_entropy, num_slots, pos_entropy, num_pos, lemma_entropy, num_lemmas = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id], topic_id, stem_analysis_file, lemma_analysis_file, pos_analysis_file)
+        results_tuple = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id], topic_id, stem_analysis_file, lemma_analysis_file, pos_analysis_file)
 
-        result.append([topic_id, slot_entropy, num_slots, pos_entropy, num_pos, lemma_entropy, num_lemmas])
+        result.append([topic_id].extend(results_tuple))
 
-    return pd.DataFrame.from_records(result, columns=['topic_id', 'slot_entropy', 'num_slots', 'pos_entropy', 'num_pos', 'lemma_entropy', 'num_lemmas'])
+    return pd.DataFrame.from_records(result, columns=['topic_id', 'weighted_slot_entropy', 'num_weighted_slots', 'weighted_pos_entropy', 'num_weighted_pos', 'weighted_lemma_entropy', 'num_weighted_lemmas', 'unweighted_slot_entropy', 'num_unweighted_slots', 'unweighted_pos_entropy', 'num_unweighted_pos', 'uweighted_lemma_entropy', 'num_unweighted_lemmas', 'weighted_ratio_slots_to_lemmas', 'weighted_ratio_pos_to_lemmas','unweighted_ratio_slots_to_lemmas', 'unweighted_ratio_pos_to_lemmas', f'lemmas_to_{top_n}_surface_forms', f'topic_coverage_by_top_{top_n}_surface_forms'])
 
 
 def stem_state_file(in_state_file, out_state_file, stemmer):
