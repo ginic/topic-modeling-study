@@ -105,7 +105,7 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	$(eval slots := $(addsuffix _slots.tsv, $(file_base)))
 	$(eval lemmas := $(addsuffix _lemmas.tsv, $(file_base)))
 	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
-	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics)
+	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics_xml)
 	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $*.tsv --vocab $*_pruned_vocab.txt --input-state $(state) --output $(author_corrs)
 	python topic_modeling/mallet_parser.py diagnostics $(diagnostics_xml) $(diagnostics_tsv)
 	python topic_modeling/mallet_parser.py slot-entropy $(state) $(entropy_metrics) -s $(slots) -l $(lemmas) -p $(pos)
@@ -131,7 +131,7 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
 	python topic_modeling/mallet_parser.py state-file $</$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID).gz $(state) --lemmatizer $(STEM_METHOD)
 	mallet run cc.mallet.util.StateToInstances --input $(state) --output $(sequence)
-	mallet train-topics --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics) --no-inference
+	mallet train-topics --input $(sequence) --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics_xml) --no-inference
 	mallet info --input $(sequence) --print-feature-counts | cut -f 1 | sort -k 1 > $(vocab)
 	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv --vocab $(vocab) --input-state $(state) --output $(author_corrs)
 	python topic_modeling/mallet_parser.py diagnostics $(diagnostics_xml) $(diagnostics_tsv)

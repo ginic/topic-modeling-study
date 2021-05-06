@@ -37,7 +37,8 @@ Running `make stemmed_corpus` will produce a folder named with the corpus target
 - The various `.mallet` and `counts.tsv` term and document frequency files produced for the stemmed tokens. Uses the same Mallet min-idf, tokenization, etc... settings for import and pruning (see the `make corpus` description above).
 
 ## Building experiments
-Running `make experiment` will run Mallet's `train-topics` command with the pruned corpus as input. Running `make stemmed_experiment` will run the `train-topics` command with the pruned, stemmed corpus as input.
+Running `make experiment` will run Mallet's `train-topics` command with the pruned corpus as input. Running `make stemmed_corpus_experiment` will run the `train-topics` command with the pruned, stemmed corpus as input.
+Running `make stemmed_post_proc_experiment` will do stemming as post-processing on the Mallet state file, then run `train-topics` with the `--no-inference`, finally generating metrics from that.
 
 All Mallet output will be put in a subfolder of the corpus target or stemmed corpus folder and will be named with the number of topics and iterations.
 

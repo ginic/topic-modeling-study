@@ -38,7 +38,7 @@ def diagnostics_xml_to_dataframe(xml_path):
 
 def write_header_to_morph_analysis_file(filepath, col_name):
     with open(filepath, 'w') as f:
-        f.write(f"topic\t{col_name}\tweighted_count\tweighted_proportion\nunweighted_count\tunweighted_proportion")
+        f.write(f"topic\t{col_name}\tweighted_count\tweighted_proportion\tunweighted_count\tunweighted_proportion\n")
 
 def get_stemmed_vocab(vocab_file, stemmer):
     '''Read in the vocabulary from a txt file, one element per line.
@@ -335,6 +335,6 @@ if __name__ == "__main__":
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
         pd.set_option('display.width', None)
-        pd.set_option('display.max_colwidth', -1)
+        pd.set_option('display.max_colwidth', None)
         print(diagnostics_df.describe())
         diagnostics_df.to_csv(args.out_tsv, sep="\t")
