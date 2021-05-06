@@ -12,7 +12,8 @@ CORPUS_TARGET := russian_novels
 #CORPUS_TARGET := toy_example
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
-STEM_METHOD := stanza
+# Used for both pre (corpus) and post (model state file) processing
+STEM_METHOD := pymystem3
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
@@ -100,25 +101,50 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	$(eval diagnostics_xml := $(addsuffix _diagnostics.xml,$(file_base)))
 	$(eval diagnostics_tsv := $(addsuffix _diagnostics.tsv,$(file_base)))
 	$(eval author_corrs := $(addsuffix _author_correlation.tsv, $(file_base)))
+	$(eval entropy_metrics := $(addsuffix _entropy.tsv, $(file_base)))
+	$(eval slots := $(addsuffix _slots.tsv, $(file_base)))
+	$(eval lemmas := $(addsuffix _lemmas.tsv, $(file_base)))
+	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
 	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics)
 	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $*.tsv --vocab $*_pruned_vocab.txt --input-state $(state) --output $(author_corrs)
 	python topic_modeling/mallet_parser.py diagnostics $(diagnostics_xml) $(diagnostics_tsv)
+	python topic_modeling/mallet_parser.py slot-entropy $(state) $(entropy_metrics) -s $(slots) -l $(lemmas) -p $(pos)
+
+# Create a post-processed Mallet state file and produce experiment metrics from it
+# TODO Clean up copy pasta! *shrug*
+%_$(TOPIC_EXPERIMENT_ID)_$(STEM_METHOD)_post: %_$(TOPIC_EXPERIMENT_ID)
+	mkdir -p $@
+	$(eval file_base := $(addsuffix /$(notdir $@),$@))
+	$(eval state := $(addsuffix .gz,$(file_base)))
+	$(eval sequence := $(addsuffix .mallet, $(file_base)))
+	$(eval vocab := $(addsuffix _vocab.tsv, $(file_base)))
+	$(eval output_model := $(addsuffix .model,$(file_base)))
+	$(eval doc_topics := $(addsuffix _doc_topics.txt,$(file_base)))
+	$(eval topic_keys := $(addsuffix _topic_keys.txt,$(file_base)))
+	$(eval top_docs := $(addsuffix _top_docs.txt, $(file_base)))
+	$(eval diagnostics_xml := $(addsuffix _diagnostics.xml,$(file_base)))
+	$(eval diagnostics_tsv := $(addsuffix _diagnostics.tsv,$(file_base)))
+	$(eval author_corrs := $(addsuffix _author_correlation.tsv, $(file_base)))
+	$(eval entropy_metrics := $(addsuffix _entropy.tsv, $(file_base)))
+	$(eval slots := $(addsuffix _slots.tsv, $(file_base)))
+	$(eval lemmas := $(addsuffix _lemmas.tsv, $(file_base)))
+	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
+	python topic_modeling/mallet_parser.py state-file $</$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID).gz $(state) --lemmatizer $(STEM_METHOD)
+	mallet run cc.mallet.util.StateToInstances --input $(state) --output $(sequence)
+	mallet train-topics --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics) --no-inference
+	mallet info --input $(sequence) --print-feature-counts | cut -f 1 | sort -k 1 > $(vocab)
+	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv --vocab $(vocab) --input-state $(state) --output $(author_corrs)
+	python topic_modeling/mallet_parser.py diagnostics $(diagnostics_xml) $(diagnostics_tsv)
+	python topic_modeling/mallet_parser.py slot-entropy $(state) $(entropy_metrics) -s $(slots) -l $(lemmas) -p $(pos)
 
 # Force all topic modeling files to depend on the output state file
-%.gz %.model %_doc_topics.txt %_topic_keys.txt %_author_correlation.tsv: %
+%.gz %.model %_doc_topics.txt %_topic_keys.txt %_author_corrs.tsv %_entropy_metrics.tsv %_diagnostics.tsv: %
 	@test ! -f $@ || touch $@
 	@test -f $@ || rm -f $<
 	@test -f $@ || $(MAKE) $(AM_MAKEFLAGS) $<
 
 # Run an experiment with default corpus and topic model settings
 experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
-	$(eval file_base := $(addsuffix /$(notdir $<),$<))
-	$(eval state := $(addsuffix .gz,$(file_base)))
-	$(eval entropy_metrics := $(addsuffix _entropy.tsv, $(file_base)))
-	$(eval slots := $(addsuffix _slots.tsv, $(file_base)))
-	$(eval lemmas := $(addsuffix _lemmas.tsv, $(file_base)))
-	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
-	python topic_modeling/mallet_parser.py slot-entropy $(state) $(entropy_metrics) -s $(slots) -l $(lemmas) -p $(pos)
 
 # Build both full and pruned Mallet corpora with default corpus settings
 # Sorry about this mess -_-
@@ -129,10 +155,10 @@ corpus: $(CORPUS_TARGET)/$(CORPUS_TARGET)_pruned.mallet $(CORPUS_TARGET)/$(CORPU
 stemmed_corpus: $(STEM_CORPUS)/$(STEM_CORPUS).tsv $(STEM_CORPUS)/$(STEM_CORPUS)_pruned.mallet $(STEM_CORPUS)/$(STEM_CORPUS)_pruned_$(FEATURE_SUFFIX) $(STEM_CORPUS)/$(STEM_CORPUS).mallet $(STEM_CORPUS)/$(STEM_CORPUS)_$(FEATURE_SUFFIX) $(STEM_CORPUS)/$(STEM_CORPUS)_vocab.txt $(STEM_CORPUS)/$(STEM_CORPUS)_pruned_vocab.txt  $(STEM_CORPUS)/$(STEM_CORPUS)_stopped.txt
 
 # Builds topic models from stemmed corpus
-stemmed_experiment: $(STEM_CORPUS)/$(STEM_CORPUS)_$(TOPIC_EXPERIMENT_ID)
+stemmed_corpus_experiment: $(STEM_CORPUS)/$(STEM_CORPUS)_$(TOPIC_EXPERIMENT_ID)
 
-# TODO Laure's email regarding doing this with Mallet
-post_processing_experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
+# Postprocess the topic model state file and produce metrics for resulting model
+stemmed_post_proc_experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)_$(STEM_METHOD)_post
 
 # Cleans up the default corpus target and stemmed corpus target
 clean:
@@ -141,11 +167,10 @@ clean:
 
 # Cleans up experiment folders only
 clean_experiments:
-	rm -r $(CORPUS_TARGET)/$(CORPUS_TARGET)_*topics_*iters
+	rm -r $(CORPUS_TARGET)/$(CORPUS_TARGET)_*topics_*iters $(CORPUS_TARGET)/$(CORPUS_TARGET)_*topics_*iters_*_post
 	rm -r $(STEM_CORPUS)/$(STEM_CORPUS)_*topics_*iters
 
-
-.PHONY: clean experiment corpus clean_experiments stemmed_corpus stemmed_experiment
+.PHONY: clean experiment corpus clean_experiments stemmed_corpus stemmed_experiment stemmed_post_proc_experiment
 
 # Don't ever clean up .tsv or .mallet files
 .PRECIOUS: %.tsv %.mallet %_pruned.mallet %$(FEATURE_SUFFIX) %_vocab.txt
