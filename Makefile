@@ -87,7 +87,7 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 
 
 # Build a topic model and save topic state from the pruned corpus
-# Also produces authorless topic models output for the experiment
+# Also produces authorless topic models output for the experiment, post process diagnostics and generate entropy measurements
 # These are probably fragile, don't use with parallel make
 %_$(TOPIC_EXPERIMENT_ID): %_pruned.mallet %_pruned_vocab.txt %.tsv
 	mkdir -p $@
@@ -97,10 +97,12 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	$(eval doc_topics := $(addsuffix _doc_topics.txt,$(file_base)))
 	$(eval topic_keys := $(addsuffix _topic_keys.txt,$(file_base)))
 	$(eval top_docs := $(addsuffix _top_docs.txt, $(file_base)))
-	$(eval diagnostics := $(addsuffix _diagnostics.xml,$(file_base)))
+	$(eval diagnostics_xml := $(addsuffix _diagnostics.xml,$(file_base)))
+	$(eval diagnostics_tsv := $(addsuffix _diagnostics.tsv,$(file_base)))
 	$(eval author_corrs := $(addsuffix _author_correlation.tsv, $(file_base)))
 	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics)
 	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $*.tsv --vocab $*_pruned_vocab.txt --input-state $(state) --output $(author_corrs)
+	python topic_modeling/mallet_parser.py diagnostics $(diagnostics_xml) $(diagnostics_tsv)
 
 # Force all topic modeling files to depend on the output state file
 %.gz %.model %_doc_topics.txt %_topic_keys.txt %_author_correlation.tsv: %
@@ -110,6 +112,13 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 
 # Run an experiment with default corpus and topic model settings
 experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
+	$(eval file_base := $(addsuffix /$(notdir $<),$<))
+	$(eval state := $(addsuffix .gz,$(file_base)))
+	$(eval entropy_metrics := $(addsuffix _entropy.tsv, $(file_base)))
+	$(eval slots := $(addsuffix _slots.tsv, $(file_base)))
+	$(eval lemmas := $(addsuffix _lemmas.tsv, $(file_base)))
+	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
+	python topic_modeling/mallet_parser.py slot-entropy $(state) $(entropy_metrics) -s $(slots) -l $(lemmas) -p $(pos)
 
 # Build both full and pruned Mallet corpora with default corpus settings
 # Sorry about this mess -_-
@@ -121,6 +130,9 @@ stemmed_corpus: $(STEM_CORPUS)/$(STEM_CORPUS).tsv $(STEM_CORPUS)/$(STEM_CORPUS)_
 
 # Builds topic models from stemmed corpus
 stemmed_experiment: $(STEM_CORPUS)/$(STEM_CORPUS)_$(TOPIC_EXPERIMENT_ID)
+
+# TODO Laure's email regarding doing this with Mallet
+post_processing_experiment: $(CORPUS_TARGET)/$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID)
 
 # Cleans up the default corpus target and stemmed corpus target
 clean:

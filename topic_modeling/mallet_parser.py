@@ -231,7 +231,7 @@ def morphological_entropy_all_topics(in_state_file, slot_analysis_file=None, lem
         tmp_list.extend(results_tuple)
         result.append(tmp_list)
 
-    return pd.DataFrame.from_records(result, columns=['topic_id', 'weighted_slot_entropy', 'num_weighted_slots', 'weighted_pos_entropy', 'num_weighted_pos', 'weighted_lemma_entropy', 'num_weighted_lemmas', 'unweighted_slot_entropy', 'num_unweighted_slots', 'unweighted_pos_entropy', 'num_unweighted_pos', 'uweighted_lemma_entropy', 'num_unweighted_lemmas', 'weighted_ratio_slots_to_lemmas', 'weighted_ratio_pos_to_lemmas','unweighted_ratio_slots_to_lemmas', 'unweighted_ratio_pos_to_lemmas', f'lemmas_to_{top_n}_surface_forms', f'slots_to_{top_n}_surface_forms', f'pos_to_{top_n}_surface_forms', f'topic_coverage_by_top_{top_n}_surface_forms'])
+    return pd.DataFrame.from_records(result, columns=['topic_id', 'weighted_slot_entropy', 'num_weighted_slots', 'weighted_pos_entropy', 'num_weighted_pos', 'weighted_lemma_entropy', 'num_weighted_lemmas', 'unweighted_slot_entropy', 'num_unweighted_slots', 'unweighted_pos_entropy', 'num_unweighted_pos', 'uweighted_lemma_entropy', 'num_unweighted_lemmas', 'weighted_ratio_slots_to_lemmas', 'weighted_ratio_pos_to_lemmas','unweighted_ratio_slots_to_lemmas', 'unweighted_ratio_pos_to_lemmas', f'lemmas_to_top_{top_n}_surface_forms', f'slots_to_top_{top_n}_surface_forms', f'pos_to_top_{top_n}_surface_forms', f'topic_coverage_by_top_{top_n}_surface_forms'])
 
 
 def stem_state_file(in_state_file, out_state_file, stemmer):
