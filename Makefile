@@ -13,7 +13,7 @@ CORPUS_TARGET := russian_novels
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
 # Used for both pre (corpus) and post (model state file) processing
-STEM_METHOD := pymystem3
+STEM_METHOD := snowball
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
@@ -30,7 +30,7 @@ FEATURE_SUFFIX := counts.tsv
 TOKEN_PATTERN := "\p{L}+[\p{P}\p{L}]+\p{L}|\p{L}+"
 # Topic modeling experiments with default settings
 MALLET_IMPORT_FLAGS := --keep-sequence --token-regex $(TOKEN_PATTERN)
-NUM_TOPICS := 100
+NUM_TOPICS := 500
 NUM_ITERS := 1000
 OPTIMIZE_INTERVAL := 20
 OPTIMIZE_BURN_IN := 50
@@ -131,7 +131,7 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
 	python topic_modeling/mallet_parser.py state-file $</$(CORPUS_TARGET)_$(TOPIC_EXPERIMENT_ID).gz $(state) --lemmatizer $(STEM_METHOD)
 	mallet run cc.mallet.util.StateToInstances --input $(state) --output $(sequence)
-	mallet train-topics --input $(sequence) --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics_xml) --no-inference
+	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $(sequence) --input-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --diagnostics-file $(diagnostics_xml) --no-inference
 	mallet info --input $(sequence) --print-feature-counts | cut -f 1 | sort -k 1 > $(vocab)
 	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv --vocab $(vocab) --input-state $(state) --output $(author_corrs)
 	python topic_modeling/mallet_parser.py diagnostics $(diagnostics_xml) $(diagnostics_tsv)
