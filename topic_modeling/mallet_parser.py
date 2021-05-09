@@ -17,6 +17,7 @@ import topic_modeling.stemming as stemming
 TOPIC="topic"
 TOPIC_ID="id"
 DEFAULT_TOP_N=20
+UNKNOWN="UNKNOWN"
 
 
 def diagnostics_xml_to_dataframe(xml_path):
@@ -113,33 +114,48 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
 
     top_n_counter = 0
     for surface_form, count in topic_term_counts.most_common():
-        if count==0:
-            print("0 flag:", surface_form)
         # We're just going to grab the first analysis element from pymystem3.
         # This might be wrong in some very small numbers of edge cases where pymystem3
         # tokenization is different (usually involves hyphens).
         analysis = mystem.analyze(surface_form)[0]
 
-        for i in range(len(analysis['analysis'])):
-            morph_analysis = analysis['analysis'][i]
-            slot = morph_analysis['gr']
-            pos = slot.split("=")[0]
-            weight = morph_analysis['wt']
-            lemma = morph_analysis['lex']
-            # For unweighted, just take the first result
-            if i==0:
-                unweighted_slot_counts[slot] += count
-                unweighted_lemma_counts[lemma] += count
-                unweighted_pos_counts[pos] += count
-                if top_n_counter < top_n:
-                    lemmas_in_top_n_terms[lemma] += count
-                    slots_in_top_n_terms[slot] += count
-                    pos_in_top_n_terms[pos] += count
+        # Pymystem returns no analysis, use UNKNOWN
+        if len(analysis['analysis']) == 0:
+            slot = UNKNOWN
+            lemma = UNKNOWN
+            pos=UNKNOWN
+            unweighted_slot_counts[slot] += count
+            unweighted_lemma_counts[lemma] += count
+            unweighted_pos_counts[pos] += count
+            weighted_slot_counts[slot] += count
+            weighted_lemma_counts[lemma] += count
+            weighted_pos_counts[pos] += count
+            if top_n_counter < top_n:
+                lemmas_in_top_n_terms[lemma] += count
+                slots_in_top_n_terms[slot] += count
+                pos_in_top_n_terms[pos] += count
 
-            if weight != 0:
-                weighted_slot_counts[slot] += weight*count
-                weighted_lemma_counts[lemma] += weight*count
-                weighted_pos_counts[pos] += weight*count
+        else:
+            for i in range(len(analysis['analysis'])):
+                morph_analysis = analysis['analysis'][i]
+                slot = morph_analysis['gr']
+                pos = slot.split("=")[0]
+                weight = morph_analysis['wt']
+                lemma = morph_analysis['lex']
+                # For unweighted, just take the first result
+                if i==0:
+                    unweighted_slot_counts[slot] += count
+                    unweighted_lemma_counts[lemma] += count
+                    unweighted_pos_counts[pos] += count
+                    if top_n_counter < top_n:
+                        lemmas_in_top_n_terms[lemma] += count
+                        slots_in_top_n_terms[slot] += count
+                        pos_in_top_n_terms[pos] += count
+
+                if weight != 0:
+                    weighted_slot_counts[slot] += weight*count
+                    weighted_lemma_counts[lemma] += weight*count
+                    weighted_pos_counts[pos] += weight*count
 
         top_n_counter += 1
 
@@ -331,6 +347,7 @@ if __name__ == "__main__":
 
     else:
         diagnostics_df = diagnostics_xml_to_dataframe(args.in_xml)
+        diagnostics_df['negative_coherence'] = - diagnostics_df['coherence']
         # Make sure pandas will print everything
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
