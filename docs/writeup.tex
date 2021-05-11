@@ -188,13 +188,15 @@ After pre-processing the corpus using each stemmer or lemmatizer, we trained 5 m
     \label{fig:slot_lemma_figs}
 \end{figure*}
 \subsection{Qualitative Observations}
-At the most basic level, we want to check to what extent topic modeling on this Russian literary corpus produces sensible results, showing some topics that correlate with metadata and others that capture general themes not specific to a particular author or time period. Author entropy does not directly measure model quality, in fact users often want topic models not correlated with known metadata \cite{Thompson2018AuthorlessTM}. However, it can at least reassure us that LDA performs on Russian in a way that is expectedly similar to English. Both the author correlation measures plotted in Appendix \ref{sec:author} and anecdotal analysis of topics' key words find topics that are specific to particular texts. Moreover, conflation treatments do not seem to affect
+At the most basic level, we want to check to what extent topic modeling on this Russian literary corpus produces sensible results, showing some topics that correlate with metadata and others that capture general themes not specific to a particular author or time period. Author entropy does not directly measure model quality, in fact users often want topic models not correlated with known metadata \cite{Thompson2018AuthorlessTM}. However, it can at least reassure us that LDA performs on Russian in a way that is expectedly similar to English. Both the author correlation measures plotted in Appendix \ref{sec:author} and anecdotal analysis of topics' key words find topics with both low and high author entropy.
 
-\subsection{Conflation Treatments}
+Moreover, lemmatization and stemming with Snowball do not seem to affect whether author-specific topics or cross-cutting topics are learned, regardless of the number of topics. Compared to the other conflation treatments, truncation does reduce the number of topics with low author entropy, but only when the number of topics is low.
+
+\subsection{Lemmatizer Choice Matters}
 
 When examining the relative strengths of the stemmers and lemmatizers, laid out in figure \ref{fig:conflation_merics}, functional differences between the two lemmatizers are revealed. As expected, truncation, having the least type-token ratio, is the most aggressive treatment in terms of producing the largest word-type equivalence classes. The suprise is that Mystem is the next most agressive, followed by Snowball, then Stanza. Since both Mystem and Stanza map surface forms to a normalized dictionary lemma, we expect them to be roughly equivalent in conflation strength.
 
-This seemingly counter-intuitive result exposes a difference in the way that Mystem and Stanza handle verbal aspect. Nearly all Russian verbs have two infinitive forms, one for the imperfective aspect and one for the perfective aspect \cite{wade2020comprehensive}. Mystem treats all conjugations of the both imperfective and perfective aspects as surface forms of the same lexeme, mapping to the imperfective inifitive as the lemma. In contrast, Stanza maps to separate lemmas, imperfective forms to the imperfective infintive and perfective forms to the perfective infinitive. A clarifying example is given in table \ref{table:verbaspect}. As a non-native speaker, it's difficult predict what impact this distinction would have on topic interpretability, but the takeaway is that not all lemmatizers are equal. The choice of lemmatizer is not obvious and requires consideration of how the implementation groups the language's grammatical features.
+This seemingly counter-intuitive result exposes a difference in the way that Mystem and Stanza handle verbal aspect. Nearly all Russian verbs have two infinitive forms, one for the imperfective aspect and one for the perfective aspect \cite{wade2020comprehensive}. Mystem treats all conjugations of the both imperfective and perfective aspects as surface forms of the same lexeme, mapping to the imperfective inifitive as the lemma. In contrast, Stanza maps to separate lemmas, imperfective forms to the imperfective infintive and perfective forms to the perfective infinitive. A clarifying example is given in table \ref{table:verbaspect}. As a non-native speaker, it's difficult predict what impact this distinction would have on topic interpretability, but the takeaway is that not all lemmatizers are equal. The choice of lemmatizer is not obvious and requires consideration of how the implementation groups the language's grammatical features and which grammatical feature matter in the corpus domain.
 
 \begin{center}
     \includegraphics[width=0.5\textwidth]{lemma_slot_entropy_scatter.png}
@@ -238,7 +240,7 @@ Corpora from other domains - Russian National Corpus and OpenCorpus
     \captionof{figure}{Balanced Author metric values for the 5 topic models trained for each number of topics $T \in \{50, 100,250, 500\}$, broken down by the number of topics and the type of metrics  conflation treament used.}
     \label{fig:mmauthor}
 \end{center}
-
+\pagebreak
 \section{MALLET Diagnostics Metrics}
 \begin{figure*}[!th]
     \includegraphics[width=0.5\textwidth]{negative_coherence.png}
@@ -247,7 +249,7 @@ Corpora from other domains - Russian National Corpus and OpenCorpus
     \includegraphics[width=0.5\textwidth]{corpus_dist.png}
     \includegraphics[width=0.5\textwidth]{exclusivity.png}
     \includegraphics[width=0.5\textwidth]{word-length.png}
-    \caption{Values of metrics that capture morphological information in topics. These results are for topic models trained on the untreated corpus.}
+    \caption{Comparing averages over of metrics produced by MALLET between conflation treatments. These are mainly provided as a sanity check. Note that word-length is much higher for lemmatizers than stemmers, as expected.}
     \label{fig:slot_lemma_figs}
 \end{figure*}
 
