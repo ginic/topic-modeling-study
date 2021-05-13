@@ -2,7 +2,7 @@
 Independent study on topic modeling with a focus on investigating non-English literary corpora.
 
 # Dependencies for experiments
-- [Mallet](http://mallet.cs.umass.edu) should be installed and available in the path
+- [Mallet](http://mallet.cs.umass.edu) should be installed and available in the path. It must be the latest version from Github, not the version from the website. 
 - [Make](https://en.wikipedia.org/wiki/Make_(software)) to easily build corpus and topic experiments (tested with GNU Make)
 
 # Installation for python library
