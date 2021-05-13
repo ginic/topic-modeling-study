@@ -18,11 +18,22 @@
 }
 
 
-@article{May2016AnAO,
+@unpublished{May2016AnAO,
   title={An Analysis of Lemmatization on Topic Models of Morphologically Rich Language},
   author={Chandler May and Ryan Cotterell and Benjamin Van Durme},
-  journal={arXiv: Computation and Language},
+  url={https://arxiv.org/abs/1608.03995},
   year={2016}
+}
+
+@article{koltsova2013,
+author = {Koltsova, Olessia and Koltsov, Sergei},
+year = {2013},
+month = {06},
+pages = {},
+title = {Mapping the Public Agenda with Topic Modeling: The Case of the Russian LiveJournal},
+volume = {5},
+journal = {Policy \& Internet},
+doi = {10.1002/1944-2866.POI331}
 }
 
 %------------------------------------
@@ -35,13 +46,194 @@
   year={2018}
 }
 
+@article{mcfarland2013differentiating,
+  title={Differentiating language usage through topic models},
+  author={McFarland, Daniel A and Ramage, Daniel and Chuang, Jason and Heer, Jeffrey and Manning, Christopher D and Jurafsky, Daniel},
+  journal={Poetics},
+  volume={41},
+  number={6},
+  pages={607--625},
+  year={2013},
+  publisher={Elsevier}
+}
+@inproceedings{vogel-jurafsky-2012-said,
+    title = "He Said, She Said: Gender in the {ACL} {A}nthology",
+    author = "Vogel, Adam  and
+      Jurafsky, Dan",
+    booktitle = "Proceedings of the {ACL}-2012 Special Workshop on Rediscovering 50 Years of Discoveries",
+    month = jul,
+    year = "2012",
+    address = "Jeju Island, Korea",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/W12-3204",
+    pages = "33--41",
+}
+
+@article{schofield-mimno-2016-comparing,
+    title = "Comparing Apples to Apple: The Effects of Stemmers on Topic Models",
+    author = "Schofield, Alexandra  and
+      Mimno, David",
+    journal = "Transactions of the Association for Computational Linguistics",
+    volume = "4",
+    year = "2016",
+    url = "https://www.aclweb.org/anthology/Q16-1021",
+    pages = "287--300",
+    abstract = "Rule-based stemmers such as the Porter stemmer are frequently used to preprocess English corpora for topic modeling. In this work, we train and evaluate topic models on a variety of corpora using several different stemming algorithms. We examine several different quantitative measures of the resulting models, including likelihood, coherence, model stability, and entropy. Despite their frequent use in topic modeling, we find that stemmers produce no meaningful improvement in likelihood and coherence and in fact can degrade topic stability.",
+}
+
+@inproceedings{devinney-etal-2020-semi,
+    title = "Semi-Supervised Topic Modeling for Gender Bias Discovery in {E}nglish and {S}wedish",
+    author = {Devinney, Hannah  and
+      Bj{\"o}rklund, Jenny  and
+      Bj{\"o}rklund, Henrik},
+    booktitle = "Proceedings of the Second Workshop on Gender Bias in Natural Language Processing",
+    month = dec,
+    year = "2020",
+    address = "Barcelona, Spain (Online)",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/2020.gebnlp-1.8",
+    pages = "79--92",
+    abstract = "Gender bias has been identified in many models for Natural Language Processing, stemming from implicit biases in the text corpora used to train the models. Such corpora are too large to closely analyze for biased or stereotypical content. Thus, we argue for a combination of quantitative and qualitative methods, where the quantitative part produces a view of the data of a size suitable for qualitative analysis. We investigate the usefulness of semi-supervised topic modeling for the detection and analysis of gender bias in three corpora (mainstream news articles in English and Swedish, and LGBTQ+ web content in English). We compare differences in topic models for three gender categories (masculine, feminine, and nonbinary or neutral) in each corpus. We find that in all corpora, genders are treated differently and that these differences tend to correspond to hegemonic ideas of gender.",
+}
 %------------------------------------
+% LDA
+%------------------------------------
+@article{blei2003,
+author = {Blei, David M. and Ng, Andrew Y. and Jordan, Michael I.},
+title = {Latent Dirichlet Allocation},
+year = {2003},
+issue_date = {3/1/2003},
+publisher = {JMLR.org},
+volume = {3},
+number = {null},
+issn = {1532-4435},
+abstract = {We describe latent Dirichlet allocation (LDA), a generative probabilistic model for collections of discrete data such as text corpora. LDA is a three-level hierarchical Bayesian model, in which each item of a collection is modeled as a finite mixture over an underlying set of topics. Each topic is, in turn, modeled as an infinite mixture over an underlying set of topic probabilities. In the context of text modeling, the topic probabilities provide an explicit representation of a document. We present efficient approximate inference techniques based on variational methods and an EM algorithm for empirical Bayes parameter estimation. We report results in document modeling, text classification, and collaborative filtering, comparing to a mixture of unigrams model and the probabilistic LSI model.},
+journal = {J. Mach. Learn. Res.},
+month = mar,
+pages = {993–1022},
+numpages = {30}
+}
+
+@article{steyvers2007probabilistic,
+  title={Probabilistic topic models},
+  author={Steyvers, Mark and Griffiths, Tom},
+  journal={Handbook of latent semantic analysis},
+  volume={427},
+  number={7},
+  pages={424--440},
+  year={2007}
+}
+
+@inproceedings{wallach2009rethinking,
+  title={Rethinking LDA: Why priors matter},
+  author={Wallach, Hanna M and Mimno, David M and McCallum, Andrew},
+  booktitle={Advances in neural information processing systems},
+  pages={1973--1981},
+  year={2009}
+}
+@unpublished{McCallumMALLET,
+    author = "Andrew Kachites McCallum",
+    title = "MALLET: A Machine Learning for Language Toolkit",
+    note = "http://www.cs.umass.edu/~mccallum/mallet",
+    year = 2002}
+%------------------------------------
+% Morphological complexity
+%------------------------------------
+@book{baerman2015understanding,
+  title={Understanding and measuring morphological complexity},
+  author={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
+  year={2015},
+  publisher={Oxford University Press, USA}
+}
+
+
+@incollection{baerman2015intro,
+  booktitle={Understanding and measuring morphological complexity},
+  editor={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
+  year={2015},
+  publisher={Oxford University Press, USA},
+  title={Understanding and measuring morphological complexity: An introduction},
+  author={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
+  chapter={1}
+}
+
+@incollection{Milizia2015PatternsOS,
+  booktitle={Understanding and measuring morphological complexity},
+  editor={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
+  year={2015},
+  publisher={Oxford University Press, USA},
+  title={Patterns of syncretism and paradigm complexity: The case of Old and Middle Indic declension},
+  author={Paolo Milizia},
+  chapter={8}
+}
+
+@incollection{anderson2015,
+  booktitle={Understanding and measuring morphological complexity},
+  editor={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
+  year={2015},
+  publisher={Oxford University Press, USA},
+  title={Dimensions of morphological complexity},
+  author={Anderson, Stephen R.},
+  chapter={2}
+}
+
+
+@article{cotterell-etal-2019-complexity,
+    title = "On the Complexity and Typology of Inflectional Morphological Systems",
+    author = "Cotterell, Ryan  and
+      Kirov, Christo  and
+      Hulden, Mans  and
+      Eisner, Jason",
+    journal = "Transactions of the Association for Computational Linguistics",
+    volume = "7",
+    month = mar,
+    year = "2019",
+    url = "https://www.aclweb.org/anthology/Q19-1021",
+    pages = "327--342"
+}
+
+@book{spencer1991morphological,
+  title={Morphological Theory: An Introduction to Word Structure in Generative Grammar},
+  author={Spencer, A.},
+  isbn={9780631161448},
+  lccn={lc90044350},
+  series={Blackwell Textbooks in Linguistics},
+  year={1991},
+  publisher={Wiley}
+}
+
+@book{aronoff1976word,
+  title={Word Formation in Generative Grammar},
+  author={Aronoff, M.},
+  isbn={9780262510172},
+  lccn={76020583},
+  series={Linguistic inquiry monographs},
+  year={1976},
+  publisher={MIT Press}
+}
+
+@inproceedings{sylak-glassman-etal-2015-language,
+    title ={A Language-Independent Feature Schema for Inflectional Morphology},
+    author={Sylak-Glassman, John and Kirov, Christo and Yarowsky, David and Que, Roger},
+    booktitle ={Proceedings of the 53rd Annual Meeting of the Association for Computational Linguistics and the 7th International Joint Conference on Natural Language Processing (Volume 2: Short Papers)},
+    month = {jul},
+    year = {2015},
+    address = {Beijing, China},
+    publisher = {Association for Computational Linguistics},
+    url = {https://www.aclweb.org/anthology/P15-2111},
+    pages = {674--680}
+}
+%--------------------------------
 % Russian Lemmatization and Stemming
 %------------------------------------
 @inproceedings{Sharoff2011ThePP,
-  title={The proper place of men and machines in language technology Processing Russian without any linguistic knowledge},
+  title={The proper place of men and machines in language technology: Processing Russian without any linguistic knowledge},
   author={Serge Sharoff and Joakim Nivre},
-  year={2011}
+  year={2011},
+  publisher={Dialogue: Computational Linguistics and Intellectual Technologies},
+  url={http://www.dialog-21.ru/media/1459/58.pdf},
+  pages={657--670},
+  address={Moscow, Russia}
 }
 
 % Mystem
@@ -53,7 +245,7 @@
 }
 
 % pymorphy2
-@incollection{
+@incollection{pymorphy2,
    year={2015},
    isbn={978-3-319-26122-5},
    booktitle={Analysis of Images, Social Networks and Texts},
@@ -85,3 +277,84 @@
  year = {2020}
 }
 
+@book{wade2020comprehensive,
+  title={A Comprehensive Russian Grammar},
+  author={Wade, T. and Gillespie, D. and Gural, S. and Korneeva, M.},
+  isbn={9781119520290},
+  lccn={2019045086},
+  series={Blackwell Reference Grammars},
+  url={https://books.google.com/books?id=5qraDwAAQBAJ},
+  year={2020},
+  publisher={Wiley}
+}
+
+@book{zaliznyak1977,
+author={Zaliznyak, Ayndrey},
+title={Grammaticheskij Slovar' Russkogo Jazyka [Grammatical Dictionary of the Russian Language]},
+year={1977}
+}
+
+@inproceedings{boguslavsky-etal-2000-dependency,
+    title = "Dependency Treebank for {R}ussian: Concept, Tools, Types of Information",
+    author = "Boguslavsky, Igor  and
+      Grigorieva, Svetlana  and
+      Grigoriev, Nikolai  and
+      Kreidlin, Leonid  and
+      Frid, Nadezhda",
+    booktitle = "{COLING} 2000 Volume 2: The 18th International Conference on Computational Linguistics",
+    year = "2000",
+    url = "https://www.aclweb.org/anthology/C00-2143"
+}
+
+@inproceedings{lipenkova-soucek-2014-converting,
+    title = "Converting {R}ussian Dependency Treebank to {S}tanford Typed Dependencies Representation",
+    author = "Lipenkova, Janna  and
+      Sou{\v{c}}ek, Milan",
+    booktitle = "Proceedings of the 14th Conference of the {E}uropean Chapter of the Association for Computational Linguistics, volume 2: Short Papers",
+    month = apr,
+    year = "2014",
+    address = "Gothenburg, Sweden",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/E14-4028",
+    pages = "143--147"
+}
+
+@inproceedings{mcdonald-etal-2013-universal,
+    title = "{U}niversal {D}ependency Annotation for Multilingual Parsing",
+    author = {McDonald, Ryan  and
+      Nivre, Joakim  and
+      Quirmbach-Brundage, Yvonne  and
+      Goldberg, Yoav  and
+      Das, Dipanjan  and
+      Ganchev, Kuzman  and
+      Hall, Keith  and
+      Petrov, Slav  and
+      Zhang, Hao  and
+      T{\"a}ckstr{\"o}m, Oscar  and
+      Bedini, Claudia  and
+      Bertomeu Castell{\'o}, N{\'u}ria  and
+      Lee, Jungmee},
+    booktitle = "Proceedings of the 51st Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers)",
+    month = aug,
+    year = "2013",
+    address = "Sofia, Bulgaria",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/P13-2017",
+    pages = "92--97"
+}
+
+@article{snowball,
+  author          = {Porter, Martin F.},
+  title           = {Snowball: A language for stemming algorithms},
+  url={http://snowball.tartarus.org/texts/introduction.html},
+  year            = {2001}
+}
+
+@inproceedings{droganova2018data,
+  title={Data conversion and consistency of monolingual corpora: Russian UD treebanks},
+  author={Droganova, Kira and Lyashevskaya, Olga and Zeman, Daniel},
+  booktitle={Proceedings of the 17th international workshop on treebanks and linguistic theories (tlt 2018)},
+  number={155},
+  pages={53--66},
+  year={2018}
+}

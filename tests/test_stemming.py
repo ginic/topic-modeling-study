@@ -4,6 +4,7 @@ No stemmer/lemmatizer will be perfect, but check that each gets at least
 half of the lemmas right, just to make sure nothing's totally off the rails.
 '''
 import copy
+import pandas as pd
 
 import topic_modeling.stemming
 
@@ -36,6 +37,7 @@ def helper_test_lemmatizer(lemmatizer):
     '''
     lemma_pairs = lemmatizer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
     assert len(lemma_pairs) == len(EXPECTED_LEMMAS)
+    assert lemmatizer.single_term_lemma('руке') == 'рука'
 
     # Check correct lemmas
     expected_copy = copy.deepcopy(EXPECTED_LEMMAS)
@@ -69,6 +71,8 @@ def test_snowball():
         ('нес', 'нес'), ('в', 'в'), ('руке', 'рук')]
     assert expected == stemmer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
 
+    assert stemmer.single_term_lemma('руке') == 'рук'
+
 
 def test_pymystem3():
     '''Test Pymystem3Lemmatizer'''
@@ -98,5 +102,28 @@ def test_truncation():
         ('шляпу', 'шляпу'), ('пирожком', 'пирожк'), ('нес', 'нес'), ('в', 'в'),
         ('руке', 'руке')])
     assert expected == lemmatizer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
+    assert lemmatizer.single_term_lemma('руке') == 'руке'
 
+
+
+def test_stem_counter_update():
+    stem_counter = topic_modeling.stemming.ByAuthorStemCounts()
+    stem_counter.update('Bulgakov', EXPECTED_LEMMAS)
+    count_pair = topic_modeling.stemming.NormalizedToken('жаркого', 'жаркий')
+    stem_counter.update('Bulgakov', [count_pair])
+    assert stem_counter.author_map['Bulgakov'][count_pair] == 2
+
+
+def test_stem_counter_to_df():
+    stem_counter = topic_modeling.stemming.ByAuthorStemCounts()
+    example_lemmas = [
+        topic_modeling.stemming.NormalizedToken('жаркого', 'жаркий'),
+        topic_modeling.stemming.NormalizedToken('Москве', 'Москва')
+    ]
+    stem_counter.update('Bulgakov', example_lemmas)
+    stem_counter.update('Bulgakov', example_lemmas)
+    stem_counter.update('Tolstoy', example_lemmas)
+    result_df = stem_counter.to_dataframe()
+    expected_df = pd.DataFrame({'author':['Bulgakov', 'Bulgakov', 'Tolstoy', 'Tolstoy'], 'token':['жаркого', 'москве', 'жаркого', 'москве'], 'normalized':['жаркий', 'москва', 'жаркий', 'москва'], "count":[2,2,1,1]})
+    assert result_df.equals(expected_df)
 
