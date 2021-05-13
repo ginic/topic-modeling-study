@@ -23,10 +23,6 @@ Required options:
 - `TXT_CORPUS`: a folder with raw UTF-8 text files.
 - `CORPUS_TARGET`: the target folder where all outputs will be written to
 
-## Builds to generate basic corpus analytics
-TODO: counts.tsv, vocab.txt, stopped.txt and author correlation studies
-
-
 ## Stemming the corpus
 The stemming/lemmatization options from `topic_modeling.stemming.py` are: `pymorphy2`, `pymystem3`, `snowball`, `stanza`, `truncate`
 For make, you should specify one of these in `STEM_METHOD`

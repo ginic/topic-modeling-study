@@ -13,7 +13,7 @@ CORPUS_TARGET := russian_novels
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
 # Used for both pre (corpus) and post (model state file) processing
-STEM_METHOD := snowball
+STEM_METHOD := truncate
 STEM_CORPUS := $(CORPUS_TARGET)_$(STEM_METHOD)
 
 # Path to Authorless TMs repo
@@ -30,14 +30,15 @@ FEATURE_SUFFIX := counts.tsv
 TOKEN_PATTERN := "\p{L}+[\p{P}\p{L}]+\p{L}|\p{L}+"
 # Topic modeling experiments with default settings
 MALLET_IMPORT_FLAGS := --keep-sequence --token-regex $(TOKEN_PATTERN)
-NUM_TOPICS := 500
+NUM_TOPICS := 50
 NUM_ITERS := 1000
 OPTIMIZE_INTERVAL := 20
 OPTIMIZE_BURN_IN := 50
 MALLET_TOPIC_FLAGS := --num-topics $(NUM_TOPICS) --num-iterations $(NUM_ITERS) --optimize-interval $(OPTIMIZE_INTERVAL) --optimize-burn-in $(OPTIMIZE_BURN_IN)
 
 # Naming conventions for topic models
-TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters
+EXP_COUNT=4
+TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters_$(EXP_COUNT)
 
 # Preprocessing UTF-8 text files to Mallet TSV format
 %.tsv: $(TXT_CORPUS)
