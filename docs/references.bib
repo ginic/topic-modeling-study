@@ -30,7 +30,7 @@ author = {Koltsova, Olessia and Koltsov, Sergei},
 year = {2013},
 month = {06},
 pages = {},
-title = {Mapping the Public Agenda with Topic Modeling: The Case of the Russian LiveJournal},
+title = {Mapping the Public Agenda with Topic Modeling: The Case of the {R}ussian LiveJournal},
 volume = {5},
 journal = {Policy \& Internet},
 doi = {10.1002/1944-2866.POI331}
@@ -105,10 +105,9 @@ year = {2003},
 issue_date = {3/1/2003},
 publisher = {JMLR.org},
 volume = {3},
-number = {null},
 issn = {1532-4435},
 abstract = {We describe latent Dirichlet allocation (LDA), a generative probabilistic model for collections of discrete data such as text corpora. LDA is a three-level hierarchical Bayesian model, in which each item of a collection is modeled as a finite mixture over an underlying set of topics. Each topic is, in turn, modeled as an infinite mixture over an underlying set of topic probabilities. In the context of text modeling, the topic probabilities provide an explicit representation of a document. We present efficient approximate inference techniques based on variational methods and an EM algorithm for empirical Bayes parameter estimation. We report results in document modeling, text classification, and collaborative filtering, comparing to a mixture of unigrams model and the probabilistic LSI model.},
-journal = {J. Mach. Learn. Res.},
+journal = {Journal of Machine Learning Research},
 month = mar,
 pages = {993–1022},
 numpages = {30}
@@ -127,7 +126,7 @@ numpages = {30}
 @inproceedings{wallach2009rethinking,
   title={Rethinking LDA: Why priors matter},
   author={Wallach, Hanna M and Mimno, David M and McCallum, Andrew},
-  booktitle={Advances in neural information processing systems},
+  booktitle={Advances in Neural Information Processing Systems},
   pages={1973--1981},
   year={2009}
 }
@@ -136,11 +135,49 @@ numpages = {30}
     title = "MALLET: A Machine Learning for Language Toolkit",
     note = "http://www.cs.umass.edu/~mccallum/mallet",
     year = 2002}
+
+@inproceedings{mimno2011optimizing,
+  title={Optimizing semantic coherence in topic models},
+  author={Mimno, David and Wallach, Hanna and Talley, Edmund and Leenders, Miriam and McCallum, Andrew},
+  booktitle={Proceedings of the 2011 conference on Empirical Methods in Natural Language Processing},
+  pages={262--272},
+  year={2011}
+}
+
+@inproceedings{schofield-etal-2017-pulling,
+    title = "Pulling Out the Stops: Rethinking Stopword Removal for Topic Models",
+    author = "Schofield, Alexandra  and
+      Magnusson, M{\aa}ns  and
+      Mimno, David",
+    booktitle = "Proceedings of the 15th Conference of the {E}uropean Chapter of the Association for Computational Linguistics: Volume 2, Short Papers",
+    month = apr,
+    year = "2017",
+    address = "Valencia, Spain",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/E17-2069",
+    pages = "432--436",
+    abstract = "It is often assumed that topic models benefit from the use of a manually curated stopword list. Constructing this list is time-consuming and often subject to user judgments about what kinds of words are important to the model and the application. Although stopword removal clearly affects which word types appear as most probable terms in topics, we argue that this improvement is superficial, and that topic inference benefits little from the practice of removing stopwords beyond very frequent terms. Removing corpus-specific stopwords after model inference is more transparent and produces similar results to removing those words prior to inference.",
+}
+
+@inproceedings{bischof2012exclusivity,
+author = {Bischof, Jonathan M. and Airoldi, Edoardo M.},
+title = {Summarizing Topical Content with Word Frequency and Exclusivity},
+year = {2012},
+isbn = {9781450312851},
+publisher = {Omnipress},
+address = {Madison, WI, USA},
+abstract = {Recent work in text analysis commonly describes topics in terms of their most frequent words, but the exclusivity of words to topics is equally important for communicating content. We introduce Hierarchical Poisson Convolution (HPC), a model which infers regularized estimates of the differential use of words across topics as well as their frequency within topics. HPC uses known hierarchical structure on human-labeled topics to make focused comparisons of differential usage within each branch of the hierarchy of labels. We then infer a summary for each topic in terms of words that are both frequent and exclusive. We develop a parallelized Hamiltonian Monte Carlo sampler that allows for fast and scalable computation.},
+booktitle = {Proceedings of the 29th International Coference on International Conference on Machine Learning},
+pages = {9–16},
+numpages = {8},
+location = {Edinburgh, Scotland},
+series = {ICML'12}
+}
 %------------------------------------
 % Morphological complexity
 %------------------------------------
 @book{baerman2015understanding,
-  title={Understanding and measuring morphological complexity},
+  title={Understanding and Measuring Morphological Complexity},
   author={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
   year={2015},
   publisher={Oxford University Press, USA}
@@ -148,17 +185,17 @@ numpages = {30}
 
 
 @incollection{baerman2015intro,
-  booktitle={Understanding and measuring morphological complexity},
+  booktitle={Understanding and Measuring Morphological Complexity},
   editor={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
   year={2015},
   publisher={Oxford University Press, USA},
-  title={Understanding and measuring morphological complexity: An introduction},
+  title={Understanding and Measuring Morphological Complexity: An introduction},
   author={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
   chapter={1}
 }
 
 @incollection{Milizia2015PatternsOS,
-  booktitle={Understanding and measuring morphological complexity},
+  booktitle={Understanding and Measuring Morphological Complexity},
   editor={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
   year={2015},
   publisher={Oxford University Press, USA},
@@ -168,7 +205,7 @@ numpages = {30}
 }
 
 @incollection{anderson2015,
-  booktitle={Understanding and measuring morphological complexity},
+  booktitle={Understanding and Measuring Morphological Complexity},
   editor={Baerman, Matthew and Brown, Dunstan and Corbett, Greville G},
   year={2015},
   publisher={Oxford University Press, USA},
@@ -253,7 +290,7 @@ numpages = {30}
    series={Communications in Computer and Information Science},
    editor={Khachay, Mikhail Yu. and Konstantinova, Natalia and Panchenko, Alexander and Ignatov, Dmitry I. and Labunets, Valeri G.},
    doi={10.1007/978-3-319-26123-2_31},
-   title={Morphological Analyzer and Generator for Russian and Ukrainian Languages},
+   title={Morphological Analyzer and Generator for {R}ussian and {U}krainian Languages},
    url={http://dx.doi.org/10.1007/978-3-319-26123-2_31},
    publisher={Springer International Publishing},
    keywords={Morphological analyzer; Russian; Ukrainian; Morphological generator; Open source; OpenCorpora; LanguageTool; pymorphy2; pymorphy},
@@ -263,7 +300,7 @@ numpages = {30}
 }
 
 @inproceedings{Sorokin2017MorphoRuEval2017AE,
-  title={MorphoRuEval-2017: an Evaluation Track for the Automatic Morphological Analysis Methods for Russian},
+  title={MorphoRuEval-2017: an Evaluation Track for the Automatic Morphological Analysis Methods for {R}ussian},
   author={A. Sorokin and Tatiana Shavrina and Olga Lyashevskaya and B. Bocharov and S. Alexeeva and Kira Droganova and A. Fenogenova and D. Granovsky},
   year={2017}
 }
@@ -278,7 +315,7 @@ numpages = {30}
 }
 
 @book{wade2020comprehensive,
-  title={A Comprehensive Russian Grammar},
+  title={A Comprehensive {R}ussian Grammar},
   author={Wade, T. and Gillespie, D. and Gural, S. and Korneeva, M.},
   isbn={9781119520290},
   lccn={2019045086},
