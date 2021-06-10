@@ -30,22 +30,22 @@ LINE_BREAK_SPLITTER = 'line_break'
 LINE_COUNT_SPLITTER = 'line_count'
 
 def unpickle_author_counts(pickle_path):
-    '''Returns a unpickled DocumentSplitter.token_counter
+    """Returns a unpickled DocumentSplitter.token_counter
     map {author:{doc id:Counter({token:term freq within doc})}}
 
     :param pickle_path: Path to pickled DocumentSplitter.token_counter
-    '''
+    """
     with open(pickle_path, 'rb') as f:
         return pickle.load(f)
 
 def author_counts_as_dataframe(author_counts_map, keep_doc_col=False):
-    '''Given an token_counter map from Document splitter, transforms
+    """Given an token_counter map from Document splitter, transforms
     into pandas frame with columns: author, token, count.
     There is also an option to keep break down by document id.
 
     :param author_counts_map: dict, {author:{doc id:Counter({token:term freq within doc})}}
     :param keep_doc_col: boolean, defaults to False. Set to true to keep breakdown by doc_id
-    '''
+    """
     records = list()
     for a, doc_counts in author_counts_map.items():
         author_count = collections.Counter()
@@ -59,20 +59,20 @@ def author_counts_as_dataframe(author_counts_map, keep_doc_col=False):
 
 
 def get_author_label(doc_id):
-    '''Return the author from the RussianNovels corpus file name.
+    """Return the author from the RussianNovels corpus file name.
     Placeholder until better metadata handling can be put in place.
-    '''
+    """
     return doc_id.split('_')[0]
 
 class DocumentSplitter(abc.ABC):
-    '''Abstract base class for splitting documents.
+    """Abstract base class for splitting documents.
     Attributes are a tokenizer and token_counter which tracks token counts
     by author and file for sanity checking.
     The default tokenization is splitting on whitespace.
     The token_counter maps {author:{doc id:Counter({token:term freq within doc})}}
 
     Subclasses must implement the process_file method.
-    '''
+    """
     def __init__(self, tokenizer=None):
         self.token_counter = collections.defaultdict(dict)
         if tokenizer is None:
@@ -109,16 +109,16 @@ class DocumentSplitter(abc.ABC):
 
     @abc.abstractmethod
     def process_file(self, file_path):
-        '''Implementation to process the individual file into smaller documents and update `token_counter` during the process
+        """Implementation to process the individual file into smaller documents and update `token_counter` during the process
         :returns: A list of lists of tokens
             [[doc1_token1, doc1_token2,...], [doc2_token1, doc2_token2...]]
-        '''
+        """
         pass
 
     def print_authorial_statistics(self):
-        '''Prints the document, vocab and token count statistics for each author
+        """Prints the document, vocab and token count statistics for each author
         collected by this DocSplitter for each input file.
-        '''
+        """
         overall_tokens = 0
         overall_vocab = set()
         file_count = 0
@@ -147,11 +147,11 @@ class DocumentSplitter(abc.ABC):
 
 
 class LineCountSplitter(DocumentSplitter):
-    '''Raw text file broken down into snippets that are at least `line_count` lines long and at least `min_word_count`
+    """Raw text file broken down into snippets that are at least `line_count` lines long and at least `min_word_count`
     word types in length.
 
     Attributes inherited from DocumentSplitter are a tokenizer and token_counter.
-    '''
+    """
     def __init__(self, tokenizer=None, line_count=DEFAULT_LINE_COUNT,
                  min_word_count=DEFAULT_WORD_COUNT):
         self.line_count = line_count
@@ -194,10 +194,10 @@ class LineCountSplitter(DocumentSplitter):
         return results
 
 class WordCountSplitter(DocumentSplitter):
-    '''Breaks raw text file down into snippets that are the length of the
+    """Breaks raw text file down into snippets that are the length of the
     specified word_count.
     Attributes inherited from DocumentSplitter are a tokenizer and token_counter.
-    '''
+    """
     def __init__(self, tokenizer=None, word_count=DEFAULT_LINE_COUNT):
         self.word_count=word_count
         super().__init__(tokenizer)

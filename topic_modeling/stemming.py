@@ -1,9 +1,9 @@
 # coding=utf-8
-'''Shared functionalities for stemming and lemmatization.
+"""Shared functionalities for stemming and lemmatization.
 The main/script will lemmatize or stem a given input TSV in Mallet format
 and produced another TSV in Mallet format with appropriately normalized text
 and a TSV with counts of each (token,lemma) pair by author.
-'''
+"""
 import abc
 import argparse
 import csv
@@ -41,27 +41,27 @@ NormalizedToken = collections.namedtuple('NormalizedToken', 'token normalized')
 
 
 class ByAuthorStemCounts:
-    '''Maps author to term frequencies for easily generating by-author statistics.
+    """Maps author to term frequencies for easily generating by-author statistics.
     All tokens and lemmas are downcased, since that's what Mallet does
-    '''
+    """
 
     def __init__(self):
         self.author_map = collections.defaultdict(collections.Counter)
 
     def update(self, author, token_stem_pairs):
-        '''Updates frequency counts of this author for the given
+        """Updates frequency counts of this author for the given
         list of NormalizedToken pairs
 
         :param author: str, name of author to add stats for
         :param token_stem_pairs: list of NormalizedToken tuples
-        '''
+        """
         self.author_map[author].update([(t[0].lower(), t[1].lower()) for t in token_stem_pairs])
 
     def to_dataframe(self):
-        '''Returns the author_map as a pandas dataframe
+        """Returns the author_map as a pandas dataframe
         with columns for author, original token, normalized token
         (stem or lemma) and counts
-        '''
+        """
         records = list()
         for author in self.author_map:
             for token_pair, count in self.author_map[author].items():
@@ -72,28 +72,28 @@ class ByAuthorStemCounts:
 
 
 class StemmingError(Exception):
-    '''Raised when underlying stemmers do not behave as expected'''
+    """Raised when underlying stemmers do not behave as expected"""
     pass
 
 class StanzaLemmatizer:
-    '''Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
-    '''
+    """Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
+    """
     def __init__(self, keep_punct=False):
-        '''Instantiates Stanza lemmatizer and ensures 'ru' models are downloaded
+        """Instantiates Stanza lemmatizer and ensures 'ru' models are downloaded
 
         :param keep_punct: True to keep tokens/lemmas that are just punctuation
-        '''
+        """
         stanza.download('ru', processors=STANZA_SETTINGS, package=STANZA_PACKAGE)
         self.pipeline = stanza.Pipeline('ru',processors=STANZA_SETTINGS,
                                         package=STANZA_PACKAGE)
         self.keep_punct = keep_punct
 
     def lemmatize(self, text, keep_punct=False):
-        '''Returns list of (word, lemma) pairs for each word in the given text.
+        """Returns list of (word, lemma) pairs for each word in the given text.
         Stanza's sentence breaking and tokenization is used.
 
         :param text: str, Russian text to process
-        '''
+        """
         result = list()
         doc = self.pipeline(text)
         for sent in doc.sentences:
@@ -105,10 +105,10 @@ class StanzaLemmatizer:
         return result
 
     def single_term_lemma(self, word):
-        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
 
         :param word: str, single word to get lemma for
-        '''
+        """
         doc = self.pipeline(word)
         for sent in doc.sentences:
             for word in sent.words:
@@ -117,16 +117,16 @@ class StanzaLemmatizer:
 
 
 class SnowballStemmer:
-    '''Wrapper around NLTK's implementation of the Snowball Stemmer,
+    """Wrapper around NLTK's implementation of the Snowball Stemmer,
     which uses an improved Porter stemming algorithm.
     http://snowball.tartarus.org/algorithms/russian/stemmer.html
-    '''
+    """
     def __init__(self, tokenizer=None):
-        '''Instantiate NLTK Snowball stemmer. Default tokenizer
+        """Instantiate NLTK Snowball stemmer. Default tokenizer
         is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
         :param tokenizer: object with a tokenize(str) method
-        '''
+        """
         self.tokenizer = tokenizer
         if self.tokenizer is None:
             self.tokenizer = tokenization.RegexTokenizer()
@@ -134,11 +134,11 @@ class SnowballStemmer:
         self.stemmer = nltkstem.SnowballStemmer('russian')
 
     def lemmatize(self, text):
-        '''Tokenizes and stems each word in the given text.
+        """Tokenizes and stems each word in the given text.
         Returns list of (word, lemma) pairs.
 
         :param text: str, Russian text to process
-        '''
+        """
         result = list()
         tokens = self.tokenizer.tokenize(text)
         for t in tokens:
@@ -148,38 +148,38 @@ class SnowballStemmer:
         return result
 
     def single_term_lemma(self, word):
-        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
 
         :param word: str, single word to get lemma for
-        '''
+        """
         return self.stemmer.stem(word)
 
 
 class Pymystem3Lemmatizer:
-    '''Wrapper around Pymystem3 implementation. It supports Russian, Polish
+    """Wrapper around Pymystem3 implementation. It supports Russian, Polish
     and English lemmatization.
     Note that Mystem does its own tokenization.
     The analyze function returns one best lemma preduction. Example:
     >>>self.mystem.analyze("это предложение")
     >>>[{'analysis': [{'lex': 'этот', 'wt': 0.05565618415, 'gr': 'APRO=(вин,ед,сред|им,ед,сред)'}], 'text': 'это'},
        {'text': ' '}, {'analysis': [{'lex': 'предложение', 'wt': 1, 'gr': 'S,сред,неод=(вин,ед|им,ед)'}], 'text': 'предложение'}]
-    '''
+    """
     def __init__(self, keep_unanalyzed=False):
-        '''Instantiate Mystem wrapper
+        """Instantiate Mystem wrapper
 
         :param keep_unanalyzed: True to also return non-whitespace and
             non-punctuation tokens that have no morphological analysis, like numbers
-        '''
+        """
         self.mystem = pymystem3.Mystem()
         self.keep_unanalyzed = keep_unanalyzed
 
     def lemmatize(self, text):
-        '''Returns a list (token, lemma) pairs determined for the text
+        """Returns a list (token, lemma) pairs determined for the text
         by Mystem.
 
         :param text: str, text to tokenize and lemmatize.
 
-        '''
+        """
         result = list()
         analysis = self.mystem.analyze(text)
         for a in analysis:
@@ -196,10 +196,10 @@ class Pymystem3Lemmatizer:
         return result
 
     def single_term_lemma(self, word):
-        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases. The `keep_unanalyzed' flag is ignored for this method.
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases. The `keep_unanalyzed' flag is ignored for this method.
 
         :param word: str, single word to get lemma for
-        '''
+        """
         analysis = self.mystem.analyze(word)
         result = ''
         # Pymystem always ends its analysis with a new line character,
@@ -222,14 +222,14 @@ class Pymystem3Lemmatizer:
 
 
 class Pymorphy2Lemmatizer:
-    '''Wrapper around Pymorphy2Lemmatizer. Default tokenizer
+    """Wrapper around Pymorphy2Lemmatizer. Default tokenizer
     is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
     :param tokenizer: object with a tokenize(str) method
-    '''
+    """
     def __init__(self, tokenizer=None):
-        '''Instantiates pymorphy2 and specified tokenization.
-        '''
+        """Instantiates pymorphy2 and specified tokenization.
+        """
         self.tokenizer = tokenizer
         if self.tokenizer is None:
             self.tokenizer = tokenization.RegexTokenizer()
@@ -237,10 +237,10 @@ class Pymorphy2Lemmatizer:
         self.analyzer = pymorphy2.MorphAnalyzer()
 
     def lemmatize(self, text):
-        '''Return list of (token, lemma) in lemmatized with pymorphy2
+        """Return list of (token, lemma) in lemmatized with pymorphy2
 
         :param text: str, text to tokenize and lemmatize
-        '''
+        """
         result = list()
         tokens = self.tokenizer.tokenize(text)
         for t in tokens:
@@ -252,52 +252,52 @@ class Pymorphy2Lemmatizer:
         return result
 
     def single_term_lemma(self, word):
-        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
 
         :param word: str, single word to get lemma for
-        '''
+        """
         return self.analyzer.parse(word)[0].normal_form
 
 
 class TruncationStemmer:
-    '''A naive strategy to stem by keeping the first num_chars number of
+    """A naive strategy to stem by keeping the first num_chars number of
     characters in a word
-    '''
+    """
     def __init__(self, tokenizer=None, num_chars=5):
-        '''Instantiate TrucationStemmer. Default tokenizer
+        """Instantiate TrucationStemmer. Default tokenizer
         is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
         :param tokenizer: an object with a tokenize(str) method
         :param num_chars: int, word initial characters to keep, defaults to 5
-        '''
+        """
         self.tokenizer = tokenizer
         if self.tokenizer is None:
             self.tokenizer = tokenization.RegexTokenizer()
         self.num_chars = num_chars
 
     def lemmatize(self, text):
-        '''Returns list of (token, stems) pairs after tokenizing text
+        """Returns list of (token, stems) pairs after tokenizing text
         and trucating each token.
 
         :param text: str, text to tokenize and stem
-        '''
+        """
         tokens = self.tokenizer.tokenize(text)
         return [NormalizedToken(t, t[:self.num_chars]) for t in tokens]
 
     def single_term_lemma(self, word):
-        '''Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
 
         :param word: str, single word to get lemma for
-        '''
+        """
         return word[:self.num_chars]
 
 
 def pick_lemmatizer(choice):
-    '''Returns a lemmatizer object with default settings corresponding to
+    """Returns a lemmatizer object with default settings corresponding to
     user input choice
 
     :param choice: str, defined choice of lemmatizer to use
-    '''
+    """
     if choice==PYMORPHY:
         return Pymorphy2Lemmatizer()
     elif choice==PYMYSTEM:
@@ -313,7 +313,7 @@ def pick_lemmatizer(choice):
 
 
 def main(tsv_in, text_col, tsv_out, count_tsv, lemmatizer, author_col):
-    '''
+    """
 
     :param tsv_in: str, path to input tsv file
     :param text_col: int, index of column to stem/lemmatize
@@ -321,7 +321,7 @@ def main(tsv_in, text_col, tsv_out, count_tsv, lemmatizer, author_col):
     :param count_tsv: str, path to output tsv file for counts of token, lemma pairs by author
     :param lemmatizer: object with lemmatize(text) method
     :param author_col: int, index of column with author label
-    '''
+    """
     print("Lemmatizing", tsv_in)
     start = time.perf_counter()
     errors = 0

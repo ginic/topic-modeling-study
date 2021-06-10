@@ -1,8 +1,8 @@
 # coding=utf-8
-'''Catch all module of classes and functions for analysis of term and document frequencies, generating by-author statistics, etc...
+"""Catch all module of classes and functions for analysis of term and document frequencies, generating by-author statistics, etc...
 
 TODO: WIP as I figure out exactly what formats will work best for analysis
-'''
+"""
 import collections
 
 import pandas as pd
@@ -152,7 +152,7 @@ def get_by_author_word_counts_all_rows(corpus_df, text_col, author_col):
     return pd.DataFrame.from_records(results, columns = ['author','token','count'])
 
 def corpus_to_author_token_counts(corpus_path, all_rows=True):
-    '''Reads in the original corpus, tokenizes and downcases text (just like
+    """Reads in the original corpus, tokenizes and downcases text (just like
     Mallet would do) and produces by-author token counts.
     You can get results as DataFrame in two ways:
     - all_rows=True: columns are author, token, count
@@ -160,7 +160,7 @@ def corpus_to_author_token_counts(corpus_path, all_rows=True):
 
     :param corpus_path: Path to Mallet tsv format corpus with columns doc_id, author, text
     :param all_rows: boolean, select desired DataFrame output format
-    '''
+    """
     corpus = pd.read_csv(corpus_path, sep='\t', names=['doc_id', 'author', 'text'],
                                     encoding='utf-8')
 

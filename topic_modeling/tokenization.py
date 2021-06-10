@@ -1,6 +1,6 @@
 # coding=utf-8
-'''Rule based tokenization and punctuation cleaning strategies.
-'''
+"""Rule based tokenization and punctuation cleaning strategies.
+"""
 import regex
 
 # string.punctuation without hypens for compound words
@@ -25,16 +25,16 @@ KEEP_PUNCT_TOKENIZATION=r"[\p{L}\d]+[\p{P}\p{L}\d]+[\p{L}\d]|[\p{L}\d]+|\p{P}"
 NON_WHITESPACE_TOKENIZATION=r"\S+"
 
 def clean_punctuation(text):
-    '''Returns a string that matches the input text with punctuation removed
+    """Returns a string that matches the input text with punctuation removed
 
     :param text: str
-    '''
+    """
     return text.translate(str.maketrans('', '', RU_PUNCTUATION))
 
 
 class RegexTokenizer:
-    '''Tokenizer relying on the regex library for compiling expressions.
-    '''
+    """Tokenizer relying on the regex library for compiling expressions.
+    """
     def __init__(self, pattern=WORD_TYPE_NO_DIGITS_TOKENIZATION):
         self.pattern = regex.compile(pattern)
 

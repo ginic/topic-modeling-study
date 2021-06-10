@@ -1,8 +1,8 @@
 # coding=utf-8
-'''Tests for topic_modling.stemming
+"""Tests for topic_modling.stemming
 No stemmer/lemmatizer will be perfect, but check that each gets at least
 half of the lemmas right, just to make sure nothing's totally off the rails.
-'''
+"""
 import copy
 import pandas as pd
 
@@ -29,12 +29,12 @@ EXPECTED_LEMMAS = [topic_modeling.stemming.NormalizedToken(t[0], t[1]) for t in
     ('руке', 'рука')]]
 
 def helper_test_lemmatizer(lemmatizer):
-    '''These lemmatization tests are all executed the same way. Let them pass
+    """These lemmatization tests are all executed the same way. Let them pass
     if at least half the lemmas are correct. We want to make sure the
     dictionaries install correctly and that results are in the correct format.
 
     :param lemmatizer: Object with lemmatize(str) function
-    '''
+    """
     lemma_pairs = lemmatizer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
     assert len(lemma_pairs) == len(EXPECTED_LEMMAS)
     assert lemmatizer.single_term_lemma('руке') == 'рука'
@@ -49,13 +49,13 @@ def helper_test_lemmatizer(lemmatizer):
 
 
 def test_stanza():
-    '''Test StanzaLemmatizer'''
+    """Test StanzaLemmatizer"""
     lemmatizer = topic_modeling.stemming.StanzaLemmatizer()
     helper_test_lemmatizer(lemmatizer)
 
 
 def test_snowball():
-    '''Test SnowballStemmer'''
+    """Test SnowballStemmer"""
     stemmer = topic_modeling.stemming.SnowballStemmer()
     # Snowball is more agressive and actually stems, instead of lemmatizes
     expected = [('Однажды', 'однажд'), ('весною', 'весн'), ('в', 'в'),
@@ -75,20 +75,20 @@ def test_snowball():
 
 
 def test_pymystem3():
-    '''Test Pymystem3Lemmatizer'''
+    """Test Pymystem3Lemmatizer"""
     lemmatizer = topic_modeling.stemming.Pymystem3Lemmatizer()
     helper_test_lemmatizer(lemmatizer)
 
 
 def test_pymorphy2():
-    '''Test Pymorphy2Lemmatizer
-    '''
+    """Test Pymorphy2Lemmatizer
+    """
     lemmatizer  = topic_modeling.stemming.Pymorphy2Lemmatizer()
     helper_test_lemmatizer(lemmatizer)
 
 
 def test_truncation():
-    '''Test TruncationStemmer'''
+    """Test TruncationStemmer"""
     lemmatizer = topic_modeling.stemming.TruncationStemmer(num_chars=6)
     expected = ([('Однажды', 'Однажд'), ('весною', 'весною'), ('в','в'),
         ('час', 'час'), ('небывало', 'небыва'), ('жаркого', 'жарког'),

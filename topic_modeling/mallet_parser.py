@@ -42,13 +42,13 @@ def write_header_to_morph_analysis_file(filepath, col_name):
         f.write(f"topic\t{col_name}\tweighted_count\tweighted_proportion\tunweighted_count\tunweighted_proportion\n")
 
 def get_stemmed_vocab(vocab_file, stemmer):
-    '''Read in the vocabulary from a txt file, one element per line.
+    """Read in the vocabulary from a txt file, one element per line.
     Stems items and maps vocab appropriately to new indices
     Return list of vocab items and index mapping {term: index in list}.
 
     :param vocab_file: file in UTF-8 format, one term per line
     :param stemmer: a Stemmer object from topic_modeling.stemming
-    '''
+    """
     vocab = []
     vocab_index = {}
     for i, line in enumerate(open(vocab_file, mode='r', encoding='utf-8')):
