@@ -78,13 +78,13 @@ class StemmingError(Exception):
 class StanzaLemmatizer:
     """Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
     """
-    def __init__(self, keep_punct=False):
+    def __init__(self, keep_punct=False, language='ru'):
         """Instantiates Stanza lemmatizer and ensures 'ru' models are downloaded
 
         :param keep_punct: True to keep tokens/lemmas that are just punctuation
         """
         stanza.download('ru', processors=STANZA_SETTINGS, package=STANZA_PACKAGE)
-        self.pipeline = stanza.Pipeline('ru',processors=STANZA_SETTINGS,
+        self.pipeline = stanza.Pipeline(language,processors=STANZA_SETTINGS,
                                         package=STANZA_PACKAGE)
         self.keep_punct = keep_punct
 
@@ -121,7 +121,7 @@ class SnowballStemmer:
     which uses an improved Porter stemming algorithm.
     http://snowball.tartarus.org/algorithms/russian/stemmer.html
     """
-    def __init__(self, tokenizer=None):
+    def __init__(self, tokenizer=None, language='russian'):
         """Instantiate NLTK Snowball stemmer. Default tokenizer
         is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
@@ -131,7 +131,7 @@ class SnowballStemmer:
         if self.tokenizer is None:
             self.tokenizer = tokenization.RegexTokenizer()
 
-        self.stemmer = nltkstem.SnowballStemmer('russian')
+        self.stemmer = nltkstem.SnowballStemmer(language)
 
     def lemmatize(self, text):
         """Tokenizes and stems each word in the given text.
