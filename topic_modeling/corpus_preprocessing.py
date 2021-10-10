@@ -1,29 +1,32 @@
 # coding=utf-8
-"""Preprocessing operations for specially formatted corpora, such as OpenCorpora (http://opencorpora.org), Russian National Corpus (https://ruscorpora.ru/old/en/index.html) or TIGER (https://www.ims.uni-stuttgart.de/en/research/resources/corpora/tiger/).
+"""Preprocessing operations for specially formatted corpora, such as OpenCorpora (http://opencorpora.org),
+Russian National Corpus (https://ruscorpora.ru/old/en/index.html) or
+TIGER (https://www.ims.uni-stuttgart.de/en/research/resources/corpora/tiger/).
 
 Assumes you do not want to subdivide documents (unlike in the preprocessing.py
 for raw text documents), just write each corpus document to a single line in the TSV document. Appropriate stopword removal and stemming is also performed.
 
 Input options:
 - Choose the corpus format:
-    - OpenCorpora: Expect the entire corpus in a single XML file (UTF-8 encoding) (http://opencorpora.org/files/export/annot/annot.opcorpora.xml.zip)
+    - OpenCorpora: Expect the entire corpus in a single XML file (UTF-8 encoding)
+      (http://opencorpora.org/files/export/annot/annot.opcorpora.xml.zip)
     - Russian National Corpus: Folders (per genre) of many XML files (Windows-1251 encoding)
-    - TIGER: Expect the entire corpus as a single XML file (for description of format https://www.ims.uni-stuttgart.de/documents/ressourcen/werkzeuge/tigersearch/doc/html/TigerXML.html)
+    - TIGER: Expect the entire corpus as a single XML file (for description of format
+      https://www.ims.uni-stuttgart.de/documents/ressourcen/werkzeuge/tigersearch/doc/html/TigerXML.html)
 - Choose a genre restriction. There are different options depending on the corpus:
     - OpenCorpora: newspaper, encyclopedia, blogs, literary, nonfiction, legal
     - RNC: blogs, fiction, public, science, speech
 Output options:
  - Output directory: To store processed MALLET TSV files for each stemmer and the mophology oracle TSV when this is available.
 """
-# TODO separate corpus iterator from stemmer writing functionality
 from abc import ABC, abstractmethod
 import argparse
 from collections import defaultdict
 import gzip
 from pathlib import Path
-import regex
 import xml.etree.ElementTree as ET
 
+import regex
 from spacy.lang.ru import Russian
 from spacy.lang.de import German
 
@@ -34,6 +37,9 @@ from topic_modeling.tokenization import WORD_TYPE_NO_DIGITS_TOKENIZATION
 RNC = "rnc"
 OPENCORPORA = "opencorpora"
 TIGER = "tiger"
+
+SLOT_SEP = "," # Use to separate different grammatical slot info in morphological analyisis
+AMBIGUOUS_ANALYSIS_SEP = "|" # Use to separate multiple lemmas or analyses when ambiguous
 
 
 RAW = "raw" # Use for unstemmed surface forms
@@ -57,6 +63,10 @@ class TSVWriter:
             self.tsv_writer = open(self.tsv_path, mode='w', encoding='utf-8')
 
     def write_row(self, list_of_elements, delimiter='\t'):
+        """Writes a line of data to the tsv file.
+        :param list_of_elements: list of str, each element will become a column
+        :param delimiter: str, separator for the file, defaults to '\t' for tab separated
+        """
         self.tsv_writer.write(delimiter.join(list_of_elements) + '\n')
 
     def close(self):
@@ -66,6 +76,8 @@ class TSVWriter:
 class TSVDocumentWriter(TSVWriter):
     """Defines writing out to Mallet TSV format.
     Also tracks number of documents written.
+    Mallet TSV format:
+    doc_id\tmetadata\tdocument text
     """
 
     def __init__(self, tsv_path):
@@ -73,6 +85,11 @@ class TSVDocumentWriter(TSVWriter):
         super().__init__(tsv_path)
 
     def write_doc(self, doc_id, metadata, text):
+        """Writes the document to the Mallet TSV file
+        :param doc_id: str, document identifier
+        :param metadata: str, metadata to store in the second column, not used for anything at the moment
+        :param text: str, the document text
+        """
         self.write_row([doc_id, metadata, text])
         self.num_docs += 1
         if self.num_docs % 50 == 0:
@@ -110,12 +127,8 @@ class TSVOracleWriter(TSVWriter):
 
 
 class CorpusParser(ABC):
-    """What behaviours do we want corpus parsers to have?
-        - filter using stop word list, using stopwords from spacy
-        - run each doc through lemmatizer/stemmer options
-        - check that the lengths of each document are the same for each stemmer
+    """Abstract class to define required methods for iterating over a corpus in the topic modeling context.
     """
-
     def __init__(self, language, corpus_name, corpus_path, has_oracle=False):
         """
         :param language: str, two letter language code corresponding to spaCy
@@ -136,33 +149,41 @@ class CorpusParser(ABC):
         Should yield document id and the entry point to access the
         document (e.g. XML root or file path)
         """
-        pass
 
     @abstractmethod
     def token_generator(self, document_root):
         """A generator function to iterate over all tokens in the given document
         """
-        pass
 
 
 class RussianNationalCorpusParser(CorpusParser):
+    """Iterate over document files in the Russian National Corpus.
+    The corpus is structured as file tree:
+    RNC_million (root dir):
+    ├── TABLES: documentation and tag set lists
+    └── TEXTS: subcorpora - each of these folders contains xml files, 1 per document
+        ├── blogs_2013
+        ├── fiction
+        ├── public
+        ├── science
+        └── speech
     """
-    """
-    def __init__(self, rnc_root, filters=['public']):
+    def __init__(self, rnc_root, filters=None):
         """
         :param rnc_root: str or Path, The root path of the RNC, a folder containing subfolders 'TABLES' and 'TEXT'
-        :param filters: list of str, The names of subcorpus folders you'd like to process
+        :param filters: list of str, The names of subcorpus folders you'd like to process. Use filters=None to keep everything.
         """
         self.filters = filters
         super().__init__("ru", RNC, rnc_root, has_oracle=True)
 
     def document_generator(self):
-        """Generator function to iterate over all the documents in the corpus.
-        Returns the path to a single XML file
+        """Generator function to iterate over all the documents in the corpus
+        that match the subcorpus filters.
+        Returns the document id and path to a single XML file
         """
         print("Starting iteration of the Russian National Corpus")
         for subcorpus in Path(self.corpus_path / 'TEXTS').iterdir():
-            if subcorpus.name in self.filters and subcorpus.is_dir():
+            if self.filters is None or (subcorpus.name in self.filters and subcorpus.is_dir()):
                 print("Parsing subcorpus:", subcorpus.name)
                 for xml_file in subcorpus.iterdir():
                     doc_id = xml_file.stem
@@ -171,8 +192,10 @@ class RussianNationalCorpusParser(CorpusParser):
                 print("Skipping subcorpus:", subcorpus.name)
 
     def token_generator(self, xml_path):
-        """Generator function iterate over all tokens in the XML file.
-        Return the surface form, the oracle form and the morphological analysis. If there is no oracle form or morphological analysis, these will be None.
+        """Generator function to iterate over all tokens in the XML file.
+        Return the surface form, the oracle form and the morphological analysis.
+        If there is no oracle form or morphological analysis, these will be None.
+        :param xml_path: str, full path to the xml file for a single document in RNC
         """
         tree =  ET.parse(xml_path)
         for word_root in tree.iter(tag='w'):
@@ -190,22 +213,182 @@ class RussianNationalCorpusParser(CorpusParser):
                 # Strip out stress markers from surface form
                 surface_form = annotation_tail.replace('`', '')
 
-                yield surface_form, "|".join(lemmas), "|".join(grs)
+                yield surface_form, AMBIGUOUS_ANALYSIS_SEP.join(lemmas), AMBIGUOUS_ANALYSIS_SEP.join(grs)
             except AttributeError as e:
                 print(f"ERROR: Problem at tag with annotation tail '{annotation_tail}', lex '{lemmas}', gr '{grs}'")
                 raise e
 
 
 class OpenCorporaParser(CorpusParser):
+    """Parses OpenCorpora from its single xml document format.
+    Filtering is annoying, since the text XML tag is used to describe documents and publication sources.
+    The publication genres in OpenCorpora are the <tag>Тип:genre</tag> tags, where genre can be one of the following:
+    'newspaper', 'encyclopedia', 'blog', 'literature', 'nonfiction', 'legal'.
+    Note that these are mapped to the corresponding Russian translation for parsing the XML.
     """
-    """
+    # Translations for genres in OpenCorpora
+    filter_translations = {
+        'газета':'newspaper',
+        'энциклопедия':'encyclopedia',
+        'блог':'blog',
+        'художественная литература':'literature',
+        'нонфикшен':'nonfiction',
+        'юридические тексты':'legal'
+    }
+
+    def __init__(self, root_xml, filters=None):
+        """
+        :param root_xml: str, path to xml file
+        :param filters: list of str, the publication genre tags for the subcorpus you'd like to process. Use filters=None to keep everything.
+        """
+        self.set_filters(filters)
+        # These get updated as you iterate through the corpus, map doc id to genre
+        self.doc_genres = {}
+        # Store ids of leaf nodes (actual documents containing text)
+        self.doc_ids = set()
+        super().__init__("ru", OPENCORPORA, root_xml, has_oracle=True)
+
+    def set_filters(self, filters):
+        """Checks that filters are valid and sets filters for this corpus parser.
+        :param filters: list of str, the publication genre tags for the subcorpus you'd like to process. Use filters=None to keep everything.
+        """
+        if filters is None:
+            self.filters=filters
+        else:
+            self.filters = []
+            for f in filters:
+                downcase_f = f.lower()
+                if downcase_f in self.filter_translations.values():
+                    self.filters.append(downcase_f)
+                else:
+                    print(f"WARNING: Unknown filter value: {f}")
+        print("Set OpenCorpora subgenre filters to:", self.filters)
+
+    def determine_genres(self):
+        """Iterate through once to collect all genre tags for all documents
+        This is required due to the unpredictable nested structure of the corpus
+        and because not all metadata is populated down to children.
+        """
+        # Maps ids of docs where genre isn't known to their parent's id
+        unknown_genre_docs = {}
+        # Documents that are parents don't have text
+        all_parent_ids = set(['0'])
+        # Track valid ids
+        all_valid_ids = set()
+        invalid_ids = set()
+
+        print("Determining leaf node documents.")
+
+        for _, elem in ET.iterparse(self.corpus_path, events=("start", )):
+            if elem.tag == "text":
+                parent_id = str(elem.attrib['parent'])
+                elem_id = str(elem.attrib['id'])
+                all_parent_ids.add(parent_id)
+                all_valid_ids.add(elem_id)
+                # Subcorpus nodes have a parent="0" attribute
+                # For subcorpus nodes, check the genre
+                if parent_id=='0':
+                    name = elem.attrib['name']
+                    genre_found = False
+                    for tag in elem.iter(tag="tag"):
+                        tag_text = tag.text.lower()
+                        if tag_text.startswith('тип:'):
+                            russian_genre = tag_text.split(":")[1]
+                            genre = self.filter_translations[russian_genre]
+                            self.doc_genres[elem_id] = genre
+                            genre_found = True
+                            print(f"Found subcorpus '{name}' with id '{elem_id}' and genre '{genre}'.")
+                    if not genre_found:
+                        all_valid_ids.remove(elem_id)
+                        invalid_ids.add(elem_id)
+                        print(f"WARNING: No genre found for subcorpus with id '{elem_id}' and name '{name}'.")
+
+
+                # Parent's genre is inherited by child
+                elif parent_id in self.doc_genres:
+                    self.doc_genres[elem_id] = self.doc_genres[parent_id]
+                # Invalid parents invalidate children
+                elif parent_id in invalid_ids:
+                    print(f"WARNING: Invalid parent id '{parent_id}' for doc id '{elem_id}' while checking genre. Parent doesn't have valid genre.")
+                    all_valid_ids.remove(elem_id)
+                    invalid_ids.add(elem_id)
+
+                # We haven't encountered some parent in tree yet, save parent id and check later
+                else:
+                    unknown_genre_docs[elem_id] = parent_id
+
+
+        # Assign all documents with a genre or mark them as unknown permanently
+        while len(unknown_genre_docs) > 0:
+            # Iterate in reverse, since issue arises when parent_id > doc_id
+            unknown_docs_iter = list(unknown_genre_docs.items())
+            unknown_docs_iter.reverse()
+            print("Determining genre for", len(unknown_docs_iter), "remaining document(s).")
+
+            for doc_id, parent_id in unknown_docs_iter:
+                if parent_id in self.doc_genres:
+                    self.doc_genres[doc_id] = self.doc_genres[parent_id]
+                    del unknown_genre_docs[doc_id]
+                elif parent_id not in all_valid_ids or parent_id in invalid_ids:
+                    # This is something very strange, throw it away
+                    print(f"WARNING: Invalid parent id '{parent_id}' for doc id '{doc_id}' while checking genre. Parent doesn't have valid genre.")
+                    del unknown_genre_docs[doc_id]
+                    all_valid_ids.remove(doc_id)
+                    invalid_ids.add(doc_id)
+
+        # Update doc_ids to store only ids of leaf nodes
+        self.doc_ids = all_valid_ids - all_parent_ids
+        print("Finished determining leaf node documents.")
+
     def document_generator(self):
-        # TODO
-        pass
+        """Generator function to iterate over all the documents in the corpus
+        that match the subcorpus filters.
+        Returns the document id and xml node for a single document.
+        """
+        print("Starting iteration of OpenCorpora.")
+        # This is a little inefficient, as it looks at some nodes mutiple times, but hopefully won't be too slow
+        self.determine_genres()
+        print("Starting iteration through leaf node documents.")
+        for _, elem in ET.iterparse(self.corpus_path, events=("start",)):
+            # Each text tag represents a document or subcorpus
+            # We need to pull out different information depending on which
+            if elem.tag == 'text':
+                elem_id = str(elem.attrib['id'])
+                # Check it's a leaf node which contains text
+                if elem_id in self.doc_ids:
+                    if self.filters is None or (self.doc_genres[elem_id] in self.filters):
+                        yield elem_id, elem
+            # discard element
+            elem.clear()
 
     def token_generator(self, document_root):
-        # TODO
-        pass
+        """Generator fucntion to iterate over all tokens in the document's XML node.
+        Return the surface form, the oracle form and the morphological analysis.
+
+        :param document_root: etree xml node
+        """
+        for token_node in document_root.iter(tag="token"):
+            # As with RNC, you can have multiple lemmas and morphology slots for ambiguous forms
+            lemmas = []
+            morph_analyses = []
+            surface_form = token_node.attrib['text']
+            # This naming scheme seems terrible because it is
+            # Each annotation consists of...
+            for annotation in token_node.iter(tag="v"):
+                # ... a lexeme (dictionary form)
+                for lexeme in annotation.iter(tag="l"):
+                    lemmas.append(lexeme.attrib['t'])
+                    # ... and a bunch of grammatical slot information, each in its own tag
+                    # Collect all the grammatical information for a particular lexeme to a list
+                    morph_slots = []
+                    for slot in lexeme.iter(tag="g"):
+                        morph_slots.append(slot.attrib["v"])
+                    morph_analyses.append(SLOT_SEP.join(morph_slots))
+
+            # Collect up ambiguous forms
+            oracle_form = AMBIGUOUS_ANALYSIS_SEP.join(lemmas)
+            morphology = AMBIGUOUS_ANALYSIS_SEP.join(morph_analyses)
+            yield surface_form, oracle_form, morphology
 
 
 class TIGERCorpusParser(CorpusParser):
@@ -302,6 +485,8 @@ class CorpusPreprocessor:
         raw_dir.mkdir()
         self.output_tsvs[RAW] = TSVDocumentWriter(raw_dir / Path(raw_experiment_id + '.tsv'))
 
+        print("Using processing methods:", list(self.output_tsvs.keys()))
+
 
     def open_all(self):
         """Open all TSV writers"""
@@ -332,8 +517,8 @@ class CorpusPreprocessor:
                 raise e
         self.close_all()
         self.validate_document_counts()
-        print(f"{self.output_tsvs[RAW].num_docs} documents processed")
-        print(f"Finished processing corpus {self.corpus_parser.corpus_name}")
+        print(f"{self.output_tsvs[RAW].num_docs} documents processed.")
+        print(f"Finished processing corpus {self.corpus_parser.corpus_name}.")
 
     def use_token(self, token):
         """Return True if token isn't a stopword, has digits or is only punctuation
@@ -396,9 +581,10 @@ def get_corpus_parser(corpus_name, corpus_path, **kwargs):
     :param output_dir: The output directory to write all TSV files to
     """
     if corpus_name==RNC:
-        return RussianNationalCorpusParser(corpus_path, **kwargs)
+        # Just keep the news section of RNC for now
+        return RussianNationalCorpusParser(corpus_path, filters=['public'], **kwargs)
     elif corpus_name==OPENCORPORA:
-        return OpenCorporaParser(corpus_path, **kwargs)
+        return OpenCorporaParser(corpus_path, filters=['newspaper'])
     elif corpus_name==TIGER:
         return TIGERCorpusParser(corpus_path, **kwargs)
     else:
