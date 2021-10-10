@@ -129,31 +129,51 @@ class TSVOracleWriter(TSVWriter):
 class CorpusParser(ABC):
     """Abstract class to define required methods for iterating over a corpus in the topic modeling context.
     """
-    def __init__(self, language, corpus_name, corpus_path, has_oracle=False):
+    def __init__(self, language, corpus_name, corpus_path, has_oracle=False, filters=None):
         """
         :param language: str, two letter language code corresponding to spaCy
         :param corpus_name: str, identifying for the corpus, used to name TSV output files
         :param corpus_path: str or Path, path to the root directory or file(s) relevant to the corpus
         :param has_oracle: True if the corpus has gold standard annotations for lemmas and morphological analysis
-
+        :param filters: list of str or None, used to select a subcorpus
         """
         self.language = language
         self.corpus_name = corpus_name
         self.corpus_path = Path(corpus_path)
         self.has_oracle = has_oracle
+        self.filters=filters
+        self.doc_count = 0
+        self.token_count = 0
 
 
     @abstractmethod
     def document_generator(self):
         """A generator function to iterate over documents in the corpus.
-        Should yield document id and the entry point to access the
+        Yields document id and the entry point to access the
         document (e.g. XML root or file path)
+        Should also increment doc_count
         """
 
     @abstractmethod
     def token_generator(self, document_root):
-        """A generator function to iterate over all tokens in the given document
+        """A generator function to iterate over all tokens in the given document.
+        Should also increment token_count
         """
+
+    def get_average_doc_length(self):
+        """Returns the average number of kept tokens per document.
+        """
+        return self.token_count/self.doc_count
+
+    def print_corpus_statistics(self):
+        """Prints the number of documents, number of token counts and average doc length for the corpus
+        """
+        print(self.corpus_name, "corpus statistics:")
+        if self.filters is not None:
+            print("\tSubcorpus filters applied:", self.filters)
+        print("\tTotal documents:", self.doc_count)
+        print("\tTotal tokens:", self.token_count)
+        print("\tAverage doc length by tokens:", self.get_average_doc_length())
 
 
 class RussianNationalCorpusParser(CorpusParser):
@@ -173,8 +193,7 @@ class RussianNationalCorpusParser(CorpusParser):
         :param rnc_root: str or Path, The root path of the RNC, a folder containing subfolders 'TABLES' and 'TEXT'
         :param filters: list of str, The names of subcorpus folders you'd like to process. Use filters=None to keep everything.
         """
-        self.filters = filters
-        super().__init__("ru", RNC, rnc_root, has_oracle=True)
+        super().__init__("ru", RNC, rnc_root, has_oracle=True, filters=filters)
 
     def document_generator(self):
         """Generator function to iterate over all the documents in the corpus
@@ -187,7 +206,9 @@ class RussianNationalCorpusParser(CorpusParser):
                 print("Parsing subcorpus:", subcorpus.name)
                 for xml_file in subcorpus.iterdir():
                     doc_id = xml_file.stem
+                    self.doc_count+=1
                     yield doc_id, xml_file
+
             else:
                 print("Skipping subcorpus:", subcorpus.name)
 
@@ -212,8 +233,9 @@ class RussianNationalCorpusParser(CorpusParser):
 
                 # Strip out stress markers from surface form
                 surface_form = annotation_tail.replace('`', '')
-
+                self.token_count+=1
                 yield surface_form, AMBIGUOUS_ANALYSIS_SEP.join(lemmas), AMBIGUOUS_ANALYSIS_SEP.join(grs)
+
             except AttributeError as e:
                 print(f"ERROR: Problem at tag with annotation tail '{annotation_tail}', lex '{lemmas}', gr '{grs}'")
                 raise e
@@ -241,28 +263,26 @@ class OpenCorporaParser(CorpusParser):
         :param root_xml: str, path to xml file
         :param filters: list of str, the publication genre tags for the subcorpus you'd like to process. Use filters=None to keep everything.
         """
-        self.set_filters(filters)
         # These get updated as you iterate through the corpus, map doc id to genre
         self.doc_genres = {}
         # Store ids of leaf nodes (actual documents containing text)
         self.doc_ids = set()
-        super().__init__("ru", OPENCORPORA, root_xml, has_oracle=True)
+        super().__init__("ru", OPENCORPORA, root_xml, has_oracle=True, filters=self.get_filters(filters))
 
-    def set_filters(self, filters):
-        """Checks that filters are valid and sets filters for this corpus parser.
+    def get_filters(self, filters):
+        """Checks that filters are valid and returns approriate filters for this corpus parser.
         :param filters: list of str, the publication genre tags for the subcorpus you'd like to process. Use filters=None to keep everything.
         """
-        if filters is None:
-            self.filters=filters
-        else:
-            self.filters = []
+        if filters is not None:
+            valid_filters = []
             for f in filters:
                 downcase_f = f.lower()
                 if downcase_f in self.filter_translations.values():
-                    self.filters.append(downcase_f)
+                    valid_filters.append(downcase_f)
                 else:
                     print(f"WARNING: Unknown filter value: {f}")
-        print("Set OpenCorpora subgenre filters to:", self.filters)
+            return valid_filters
+        return filters
 
     def determine_genres(self):
         """Iterate through once to collect all genre tags for all documents
@@ -303,10 +323,10 @@ class OpenCorporaParser(CorpusParser):
                         invalid_ids.add(elem_id)
                         print(f"WARNING: No genre found for subcorpus with id '{elem_id}' and name '{name}'.")
 
-
                 # Parent's genre is inherited by child
                 elif parent_id in self.doc_genres:
                     self.doc_genres[elem_id] = self.doc_genres[parent_id]
+
                 # Invalid parents invalidate children
                 elif parent_id in invalid_ids:
                     print(f"WARNING: Invalid parent id '{parent_id}' for doc id '{elem_id}' while checking genre. Parent doesn't have valid genre.")
@@ -316,7 +336,6 @@ class OpenCorporaParser(CorpusParser):
                 # We haven't encountered some parent in tree yet, save parent id and check later
                 else:
                     unknown_genre_docs[elem_id] = parent_id
-
 
         # Assign all documents with a genre or mark them as unknown permanently
         while len(unknown_genre_docs) > 0:
@@ -357,7 +376,9 @@ class OpenCorporaParser(CorpusParser):
                 # Check it's a leaf node which contains text
                 if elem_id in self.doc_ids:
                     if self.filters is None or (self.doc_genres[elem_id] in self.filters):
+                        self.doc_count+=1
                         yield elem_id, elem
+
             # discard element
             elem.clear()
 
@@ -388,6 +409,7 @@ class OpenCorporaParser(CorpusParser):
             # Collect up ambiguous forms
             oracle_form = AMBIGUOUS_ANALYSIS_SEP.join(lemmas)
             morphology = AMBIGUOUS_ANALYSIS_SEP.join(morph_analyses)
+            self.token_count+=1
             yield surface_form, oracle_form, morphology
 
 
@@ -401,6 +423,7 @@ class TIGERCorpusParser(CorpusParser):
     def token_generator(self, document_root):
         # TODO
         pass
+
 
 class CorpusPreprocessor:
     def __init__(self, corpus_parser, output_dir, use_oracle=True, use_truncation_stemmers = True, truncation_settings = None):
@@ -487,7 +510,6 @@ class CorpusPreprocessor:
 
         print("Using processing methods:", list(self.output_tsvs.keys()))
 
-
     def open_all(self):
         """Open all TSV writers"""
         for _, writer in self.output_tsvs.items():
@@ -519,6 +541,7 @@ class CorpusPreprocessor:
         self.validate_document_counts()
         print(f"{self.output_tsvs[RAW].num_docs} documents processed.")
         print(f"Finished processing corpus {self.corpus_parser.corpus_name}.")
+        self.corpus_parser.print_corpus_statistics()
 
     def use_token(self, token):
         """Return True if token isn't a stopword, has digits or is only punctuation
@@ -539,7 +562,6 @@ class CorpusPreprocessor:
             message = "\n".join([f"{k}:{v.num_docs} docs" for k,v in self.output_tsvs.items()])
             message += f"\nOracle Gzip: {self.oracle_tsv.doc_index + 1}  docs"
             raise ValueError("TSV Writers wrote different numbers of documents!\n" + message)
-
 
     def process_document(self, doc_id, doc_root):
         """
@@ -571,7 +593,6 @@ class CorpusPreprocessor:
         # If everything went well, write the outputs to TSV
         for stemmer_name, tokens in processed_docs_map.items():
             self.output_tsvs[stemmer_name].write_doc(doc_id, "metadata placeholder", " ".join(tokens))
-
 
 
 def get_corpus_parser(corpus_name, corpus_path, **kwargs):
