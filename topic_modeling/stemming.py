@@ -4,6 +4,8 @@ The main/script will lemmatize or stem a given input TSV in Mallet format
 and produced another TSV in Mallet format with appropriately normalized text
 and a TSV with counts of each (token,lemma) pair by author.
 """
+# TODO language options added beyond russian for script behaviour
+# TODO add spaCy lemmatizer option (probably decent for German)
 import abc
 import argparse
 import csv
@@ -27,6 +29,7 @@ STANZA = 'stanza'
 TRUNCATE = 'truncate'
 STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE]
 
+# TODO expand beyond Russian
 # Desired stanza Russian modeling settings
 STANZA_SETTINGS = 'tokenize,pos,lemma'
 STANZA_PACKAGE = 'syntagrus'
@@ -83,7 +86,8 @@ class StanzaLemmatizer:
 
         :param keep_punct: True to keep tokens/lemmas that are just punctuation
         """
-        stanza.download('ru', processors=STANZA_SETTINGS, package=STANZA_PACKAGE)
+        # TODO need to handle other language options
+        stanza.download(language, processors=STANZA_SETTINGS, package=STANZA_PACKAGE)
         self.pipeline = stanza.Pipeline(language,processors=STANZA_SETTINGS,
                                         package=STANZA_PACKAGE)
         self.keep_punct = keep_punct
@@ -159,7 +163,7 @@ class Pymystem3Lemmatizer:
     """Wrapper around Pymystem3 implementation. It supports Russian, Polish
     and English lemmatization.
     Note that Mystem does its own tokenization.
-    The analyze function returns one best lemma preduction. Example:
+    The analyze function returns one best lemma prediction. Example:
     >>>self.mystem.analyze("это предложение")
     >>>[{'analysis': [{'lex': 'этот', 'wt': 0.05565618415, 'gr': 'APRO=(вин,ед,сред|им,ед,сред)'}], 'text': 'это'},
        {'text': ' '}, {'analysis': [{'lex': 'предложение', 'wt': 1, 'gr': 'S,сред,неод=(вин,ед|им,ед)'}], 'text': 'предложение'}]
@@ -310,6 +314,20 @@ def pick_lemmatizer(choice):
         return TruncationStemmer()
     else:
         raise ValueError(f"Stemmer choice '{choice}' is undefined")
+
+def get_language_specific_stemmers(language):
+    """..TODO
+    """
+    if language in ["russian", "ru"]:
+        stemmers = { PYMYSTEM:Pymystem3Lemmatizer(),
+                     SNOWBALL:SnowballStemmer(language='russian')
+                    }
+    elif language==["german", "de"]:
+        stemmers = { SNOWBALL:SnowballStemmer(language='german') }
+    else:
+        raise ValueError(f"Not a valid language choice: {language}")
+
+    return stemmers
 
 
 def main(tsv_in, text_col, tsv_out, count_tsv, lemmatizer, author_col):

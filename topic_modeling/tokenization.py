@@ -24,12 +24,12 @@ KEEP_PUNCT_TOKENIZATION=r"[\p{L}\d]+[\p{P}\p{L}\d]+[\p{L}\d]|[\p{L}\d]+|\p{P}"
 # Just split tokens on whitespace
 NON_WHITESPACE_TOKENIZATION=r"\S+"
 
-def clean_punctuation(text):
+def clean_punctuation(text, punct_str=RU_PUNCTUATION):
     """Returns a string that matches the input text with punctuation removed
 
     :param text: str
     """
-    return text.translate(str.maketrans('', '', RU_PUNCTUATION))
+    return text.translate(str.maketrans('', '', punct_str))
 
 
 class RegexTokenizer:
