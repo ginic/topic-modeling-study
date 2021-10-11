@@ -11,8 +11,8 @@ Input options:
     - OpenCorpora: Expect the entire corpus in a single XML file (UTF-8 encoding)
       (http://opencorpora.org/files/export/annot/annot.opcorpora.xml.zip)
     - Russian National Corpus: Folders (per genre) of many XML files (Windows-1251 encoding)
-    - TIGER: Expect the entire corpus as a single XML file (for description of format
-      https://www.ims.uni-stuttgart.de/documents/ressourcen/werkzeuge/tigersearch/doc/html/TigerXML.html)
+    - TIGER: Expect the entire corpus as a single XML file and also requires the 'documents.tsv' file from  TIGER 2.2.doc (additional download).
+      (for download and detailed description, see https://www.ims.uni-stuttgart.de/documents/ressourcen/werkzeuge/tigersearch/doc/html/TigerXML.html)
 - Choose a genre restriction. There are different options depending on the corpus:
     - OpenCorpora: newspaper, encyclopedia, blogs, literary, nonfiction, legal
     - RNC: blogs, fiction, public, science, speech
@@ -21,7 +21,8 @@ Output options:
 """
 from abc import ABC, abstractmethod
 import argparse
-from collections import defaultdict
+from collections import defaultdict, namedtuple
+import csv
 import gzip
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -161,7 +162,8 @@ class CorpusParser(ABC):
     @abstractmethod
     def token_generator(self, document_root):
         """A generator function to iterate over all tokens in the given document.
-        Should also increment token_count
+        Yields the surface form, the oracle form and the morphological analysis.
+        Should also increment token_count.
         """
 
     def get_average_doc_length(self):
@@ -218,7 +220,7 @@ class RussianNationalCorpusParser(CorpusParser):
 
     def token_generator(self, xml_path):
         """Generator function to iterate over all tokens in the XML file.
-        Return the surface form, the oracle form and the morphological analysis.
+        Yields the surface form, the oracle form and the morphological analysis.
         If there is no oracle form or morphological analysis, these will be None.
         :param xml_path: str, full path to the xml file for a single document in RNC
         """
@@ -288,7 +290,9 @@ class OpenCorporaParser(CorpusParser):
         super().__init__("ru", OPENCORPORA, root_xml, has_oracle=True, filters=self.get_filters(filters))
 
     def get_filters(self, filters):
-        """Checks that filters are valid and returns approriate filters for this corpus parser.
+        """Checks that filters are valid.
+        Returns approriate filters for this corpus parser.
+
         :param filters: list of str, the publication genre tags for the subcorpus you'd like to process. Use filters=None to keep everything.
         """
         if filters is not None:
@@ -319,14 +323,14 @@ class OpenCorporaParser(CorpusParser):
 
         for _, elem in ET.iterparse(self.corpus_path, events=(START, )):
             if elem.tag == self.DOC_TAG:
-                parent_id = str(elem.attrib['parent'])
-                elem_id = str(elem.attrib[self.ID_ATTRIB_KEY])
+                parent_id = str(elem.get('parent'))
+                elem_id = str(elem.get(self.ID_ATTRIB_KEY))
                 all_parent_ids.add(parent_id)
                 all_valid_ids.add(elem_id)
                 # Subcorpus nodes have a parent="0" attribute
                 # For subcorpus nodes, check the genre
                 if parent_id=='0':
-                    name = elem.attrib['name']
+                    name = elem.get('name')
                     genre_found = False
                     for tag in elem.iter(tag=self.META_TAG):
                         tag_text = tag.text.lower()
@@ -397,13 +401,13 @@ class OpenCorporaParser(CorpusParser):
                 # Each text tag represents a document or subcorpus
                 # We need to pull out different information depending on which
                 if elem.tag==self.DOC_TAG and event==START and self.ID_ATTRIB_KEY in elem.attrib:
-                    elem_id = str(elem.attrib[self.ID_ATTRIB_KEY])
+                    elem_id = str(elem.get(self.ID_ATTRIB_KEY))
                     # Check it's a leaf node which contains text
                     if elem_id in self.doc_ids:
                         if self.filters is None or (self.doc_genres[elem_id] in self.filters):
                             self.doc_count+=1
                             yield elem_id, doc_iter
-                # Tags can be cleared if they aren't valid documents
+            # Tags can be cleared if they aren't valid documents
                 elif event==END:
                     elem.clear()
         except StopIteration:
@@ -417,28 +421,27 @@ class OpenCorporaParser(CorpusParser):
         """
         # If this method raises an error, then the XML is malformed, so let's risk the StopIteration exception
         event, elem = next(doc_iter) # Should be first token opening tag
-        # Loop until you reach the end of the document, indicated by 'text' tag end event
+        # Loop until you reach the end of the document
         while not (elem.tag==self.DOC_TAG and event==END):
             # Examine each token
             if elem.tag==self.TOKEN_TAG and event==START:
                 # As with RNC, you can have multiple lemmas and morphology slots for ambiguous forms
                 lemmas = []
                 morph_analyses = []
-                surface_form = elem.attrib[self.SURFACE_ATTRIB_KEY]
+                surface_form = elem.get(self.SURFACE_ATTRIB_KEY)
                 event, elem = next(doc_iter)
                 while not (elem.tag==self.TOKEN_TAG and event==END):
                     if elem.tag==self.ANNOTATION_TAG and event==START:
                         morph_slots = []
                     # Each annotation consists of a lexeme dictionary form...
                     elif elem.tag==self.LEXEME_TAG and event==START:
-                        lemmas.append(elem.attrib[self.LEMMA_ATTRIB_KEY])
+                        lemmas.append(elem.get(self.LEMMA_ATTRIB_KEY))
                     # ... and a bunch of grammatical slot information, each in its own tag
                     elif elem.tag==self.GRAMMAR_TAG and event==START:
-                        morph_slots.append(elem.attrib[self.SLOT_ATTRIB_KEY])
+                        morph_slots.append(elem.get(self.SLOT_ATTRIB_KEY))
                     # After each annotation, collect all the grammatical information for a particular lexeme to a list
                     elif elem.tag==self.ANNOTATION_TAG and event==END:
                         morph_analyses.append(SLOT_SEP.join(morph_slots))
-
                     event, elem = next(doc_iter)
 
                 # Collect ambiguous forms
@@ -451,18 +454,116 @@ class OpenCorporaParser(CorpusParser):
         # After a document has been parsed, it can be discarded
         elem.clear()
 
+class TIGERDocument:
+    """
+    Convenience container for determining sentences in each TIGER document
+    Luckily sentence ids are integers and are consecutive
+    """
+    def __init__(self, doc_id, first_sentence_id, last_sentence_id, xml_iter):
+        """
+        :param doc_id: str, the document id
+        :param first_sentence_id: int, the id of the first sentence in document
+        :param last_sentence_id: int, the id of the last in document
+        :param xml_iter: ET iterparse object pointing at the first sentence in the document
+        """
+        self.doc_id = doc_id
+        self.first_sentence_id = first_sentence_id
+        self.last_sentence_id = last_sentence_id
+        self.xml_iter = xml_iter
+
 
 class TIGERCorpusParser(CorpusParser):
-    """Parses the TIGER v2.2 corpus from a single XML file.
+    """Parses the TIGER v2.2 corpus from a single XML file and the 'documents.tsv' file from TIGER 2.2.doc for the sentence to document mapping.
+
+    Note that TIGER is from a single news source and genre, so it has no subcorpus filters.
     """
+    # Constants for XML parsing
+    SENTENCE_TAG = "s"
+    TOKEN_TAG = "t"
+    WORD_ATTRIB = "word"
+    LEMMA_ATTRIB = "lemma"
+    POS_ATTRIB = "pos"
+    MORPH_ATTRIB = "morph"
+    ID_ATTRIB = "id"
+
+    def __init__(self, xml_root, sentence_map_tsv):
+        """
+        :param xml_root: str, path to the xml file containing the entire TIGER corpus tokens
+        :param sentence_map_tsv: str, path to the TSV file that has doc_id,sentence_id rows for each sentence in the corpus
+        """
+        self.sentence_map_tsv = sentence_map_tsv
+        # Tracks the document you're currently reading
+        super().__init__("de", TIGER, xml_root, has_oracle=True)
+
     def document_generator(self):
-        # TODO
-        for _, elem in ET.iterparse(self.corpus_path, events=("start", )):
-            print(elem)
+        """Generator for the documents in the corpus.
+        """
+        # Iterate until you get to the first sentence tag
+        doc_iter = ET.iterparse(self.corpus_path, events=(START, END, ))
+        self.advance_to_next_tag(doc_iter, self.SENTENCE_TAG, START)
+
+        with open(self.sentence_map_tsv, newline='', encoding="utf-8") as f:
+            prev_doc_id = None
+            for doc_id, sentence_id in csv.reader(f, dialect='unix', delimiter="\t"):
+                # If doc_id changes, you've found the last sentence and should yield the document
+                if doc_id != prev_doc_id:
+                    if prev_doc_id is not None:
+                        self.doc_count+=1
+                        yield prev_doc_id, TIGERDocument(prev_doc_id, first_sentence_id, prev_sentence_id, doc_iter)
+                    prev_doc_id = doc_id
+                    first_sentence_id = int(sentence_id)
+                    prev_sentence_id = int(sentence_id)
+                    # Advance the document iterator to the next start sentence tag
+                    self.advance_to_next_tag(doc_iter, self.SENTENCE_TAG, START)
+
+            # Don't forget the last document
+            if prev_doc_id is not None:
+                self.doc_count+=1
+                yield prev_doc_id, TIGERDocument(prev_doc_id, first_sentence_id, prev_sentence_id, doc_iter)
+
 
     def token_generator(self, document_root):
-        # TODO
-        pass
+        """Yields the surface form, the oracle form and the morphological analysis.
+
+        :param document_root: TIGERDocument object
+        """
+        current_sentence = document_root.first_sentence_id
+        for event, elem in document_root.xml_iter:
+            if event==START and elem==self.TOKEN_TAG:
+                # Morphological analyses aren't ambiguous in TIGER, so we just have to check one per word
+                surface_form = elem.get(self.WORD_ATTRIB)
+                pos = elem.get(self.POS_ATTRIB)
+                # USE comma separation of slots, to match RNC
+                morph = elem.get(self.MORPH_ATTRIB).replace(".", SLOT_SEP)
+                lemma = elem.get(self.LEMMA_ATTRIB)
+                full_morph_analysis = SLOT_SEP.join([pos, morph])
+                yield surface_form, lemma, full_morph_analysis
+            # Advance sentence counter
+            if event==START and elem==self.SENTENCE_TAG:
+                current_sentence = self.get_sentence_id_from_attrib(elem.get(self.ID_ATTRIB))
+            # The document is finished
+            elif event==END and elem==self.SENTENCE_TAG and current_sentence==document_root.last_sentence_id:
+                elem.clear()
+                break
+            elif event==END:
+                elem.clear()
+
+    def get_sentence_id_from_attrib(self, attribute_value):
+        """Returns the sentence id as an integer from the XML attribute value
+        :param attribute_value: str, the value of the sentence's 'id' attribute from xml
+        """
+        return int(attribute_value.strip('s'))
+
+    def advance_to_next_tag(self, doc_iter, tag, event_flag):
+        """Advances an iterator to the next xml tag event defined by params.
+        :param doc_iter: ETree iterparse object
+        :param tag: str, XML tag
+        :param event: "start" or "end"
+        """
+        for event, elem in doc_iter:
+            if event==event_flag and elem.tag==tag:
+                break
+            elem.clear()
 
 
 class CorpusPreprocessor:
@@ -640,16 +741,16 @@ class CorpusPreprocessor:
 def get_corpus_parser(corpus_name, corpus_path, **kwargs):
     """Returns the appropriate CorpusParser object for the corpus.
 
-    :param corpus_path: str or Path, path to the root directory or file(s) relevant to the corpus
+    :param corpus_path: list of str or Path, paths to the root directory or file(s) relevant to the corpus
     :param output_dir: The output directory to write all TSV files to
     """
     if corpus_name==RNC:
         # Just keep the news section of RNC for now
-        return RussianNationalCorpusParser(corpus_path, filters=['public'], **kwargs)
+        return RussianNationalCorpusParser(corpus_path[0], filters=['public'], **kwargs)
     elif corpus_name==OPENCORPORA:
-        return OpenCorporaParser(corpus_path, filters=['newspaper'])
+        return OpenCorporaParser(corpus_path[0], filters=['newspaper'])
     elif corpus_name==TIGER:
-        return TIGERCorpusParser(corpus_path, **kwargs)
+        return TIGERCorpusParser(corpus_path[0], **kwargs)
     else:
         raise ValueError(f"Invalid corpus choice: {corpus_name}")
 
@@ -660,14 +761,24 @@ def main(corpus_name, corpus_in, output_dir):
     preprocessor.parse_corpus()
 
 
-parser = argparse.ArgumentParser(description = "Preprocessing for corpora with "\
-    "very specific structure and format, including stopword removal, language "\
-    "appropriate stemming. Writes out preprocessed corpora to Mallet's TSV "\
-    "format and also writes out a TSV with oracular morphological information "\
-    "for terms when this is available. SpaCy's stop word list is used.")
-parser.add_argument("--corpus_in", nargs=1, required=True,
-    help="Path to corpus input file. Could be a single file or single "\
-        "directory depending on the corpus.")
+parser = argparse.ArgumentParser(
+description = """Preprocessing for specific corpora formats, including
+stopword removal, language and appropriate stemming.
+Writes out preprocessed corpora to Mallet's TSV
+format and also writes out a TSV with oracular morphological information
+for terms when this is available. SpaCy's stop word list is used.
+Currently supported corpora:
+ - Russian National Corpus (RNC)
+ - OpenCorpora (single XML file version)
+ - TIGER v2.2""",
+   formatter_class= argparse.RawTextHelpFormatter)
+parser.add_argument("--corpus_in", nargs='+', required=True,
+    help="""Path to corpus input file or files.
+Could be a single file or single directory depending on the corpus.
+These are expected input formats for each corpus (pass to --corpus_in argument):
+- RNC: Root directory to the corpus (folder containing 'TABLES' and 'TEXTS' directories)
+- OpenCorpora: Path to the single XML file version of the corpus
+- TIGER v2.2: 2 arguments required 1) XML file for the full corpus 2) TSV file containing document and sentence id mapping""")
 parser.add_argument("--corpus_name", type=str, required=True,
     choices=[RNC, OPENCORPORA, TIGER],
     help="Identifier for the corpus." )
@@ -676,4 +787,4 @@ parser.add_argument("--output_dir", required=True,
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(args.corpus_name, args.corpus_in[0], args.output_dir)
+    main(args.corpus_name, args.corpus_in, args.output_dir)
