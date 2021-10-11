@@ -416,29 +416,30 @@ class OpenCorporaParser(CorpusParser):
         :param doc_iter: an iterator positioned at the beginning of the relevant document (last element read was the 'text' start tag for the document)
         """
         # If this method raises an error, then the XML is malformed, so let's risk the StopIteration exception
-        event, elem = next(doc_iter)
+        event, elem = next(doc_iter) # Should be first token opening tag
         # Loop until you reach the end of the document, indicated by 'text' tag end event
         while not (elem.tag==self.DOC_TAG and event==END):
-            if elem.tag==self.TOKEN_TAG and event==END:
+            # Examine each token
+            if elem.tag==self.TOKEN_TAG and event==START:
                 # As with RNC, you can have multiple lemmas and morphology slots for ambiguous forms
                 lemmas = []
                 morph_analyses = []
                 surface_form = elem.attrib[self.SURFACE_ATTRIB_KEY]
+                event, elem = next(doc_iter)
                 while not (elem.tag==self.TOKEN_TAG and event==END):
-                    event, elem = next(doc_iter) # Should be opening annotation tag
-                    morph_slots = []
+                    if elem.tag==self.ANNOTATION_TAG and event==START:
+                        morph_slots = []
+                    # Each annotation consists of a lexeme dictionary form...
+                    elif elem.tag==self.LEXEME_TAG and event==START:
+                        lemmas.append(elem.attrib[self.LEMMA_ATTRIB_KEY])
+                    # ... and a bunch of grammatical slot information, each in its own tag
+                    elif elem.tag==self.GRAMMAR_TAG and event==START:
+                        morph_slots.append(elem.attrib[self.SLOT_ATTRIB_KEY])
+                    # After each annotation, collect all the grammatical information for a particular lexeme to a list
+                    elif elem.tag==self.ANNOTATION_TAG and event==END:
+                        morph_analyses.append(SLOT_SEP.join(morph_slots))
 
-                    # Each annotation consists of...
-                    while not (elem.tag==self.ANNOTATION_TAG and event==END):
-                        # ... a lexeme (dictionary form)
-                        if elem.tag==self.LEXEME_TAG and event ==START:
-                            lemmas.append(elem.attrib[self.LEMMA_ATTRIB_KEY])
-                        # ... and a bunch of grammatical slot information, each in its own tag
-                        elif elem.tag==self.GRAMMAR_TAG and event==START:
-                            morph_slots.append(elem.attrib[self.SLOT_ATTRIB_KEY])
-                        event, elem = next(doc_iter)
-                    # Collect all the grammatical information for a particular lexeme to a list
-                    morph_analyses.append(SLOT_SEP.join(morph_slots))
+                    event, elem = next(doc_iter)
 
                 # Collect ambiguous forms
                 oracle_form = AMBIGUOUS_ANALYSIS_SEP.join(lemmas)
