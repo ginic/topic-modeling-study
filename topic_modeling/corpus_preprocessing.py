@@ -45,6 +45,10 @@ AMBIGUOUS_ANALYSIS_SEP = "|" # Use to separate multiple lemmas or analyses when 
 RAW = "raw" # Use for unstemmed surface forms
 ORACLE = "oracle" # Use for oracle lemmatized forms
 
+# XML event flags
+START = "start"
+END = "end"
+
 class TSVWriter:
     """A simple TSV writer wrapper"""
     def __init__(self, tsv_path, as_gzip=False):
@@ -248,6 +252,20 @@ class OpenCorporaParser(CorpusParser):
     'newspaper', 'encyclopedia', 'blog', 'literature', 'nonfiction', 'legal'.
     Note that these are mapped to the corresponding Russian translation for parsing the XML.
     """
+    # Constants for the XML namespace
+    # Yes, OpenCorpora uses the same values for different things, but let's name them differently here for clarity
+    DOC_TAG = "text"
+    META_TAG = "tag"
+    ANNOTATION_TAG = "v"
+    LEXEME_TAG = "l"
+    GRAMMAR_TAG = "g"
+    SLOT_ATTRIB_KEY = "v"
+    LEMMA_ATTRIB_KEY = "t"
+    TOKEN_TAG = "token"
+    SURFACE_ATTRIB_KEY = "text"
+    ID_ATTRIB_KEY = "id"
+
+
     # Translations for genres in OpenCorpora
     filter_translations = {
         'газета':'newspaper',
@@ -284,7 +302,7 @@ class OpenCorporaParser(CorpusParser):
             return valid_filters
         return filters
 
-    def determine_genres(self):
+    def _determine_genres(self):
         """Iterate through once to collect all genre tags for all documents
         This is required due to the unpredictable nested structure of the corpus
         and because not all metadata is populated down to children.
@@ -299,10 +317,10 @@ class OpenCorporaParser(CorpusParser):
 
         print("Determining leaf node documents.")
 
-        for _, elem in ET.iterparse(self.corpus_path, events=("start", )):
-            if elem.tag == "text":
+        for _, elem in ET.iterparse(self.corpus_path, events=(START, )):
+            if elem.tag == self.DOC_TAG:
                 parent_id = str(elem.attrib['parent'])
-                elem_id = str(elem.attrib['id'])
+                elem_id = str(elem.attrib[self.ID_ATTRIB_KEY])
                 all_parent_ids.add(parent_id)
                 all_valid_ids.add(elem_id)
                 # Subcorpus nodes have a parent="0" attribute
@@ -310,7 +328,7 @@ class OpenCorporaParser(CorpusParser):
                 if parent_id=='0':
                     name = elem.attrib['name']
                     genre_found = False
-                    for tag in elem.iter(tag="tag"):
+                    for tag in elem.iter(tag=self.META_TAG):
                         tag_text = tag.text.lower()
                         if tag_text.startswith('тип:'):
                             russian_genre = tag_text.split(":")[1]
@@ -336,6 +354,8 @@ class OpenCorporaParser(CorpusParser):
                 # We haven't encountered some parent in tree yet, save parent id and check later
                 else:
                     unknown_genre_docs[elem_id] = parent_id
+            # Reclaim memory as you iterate through the XML tree
+            elem.clear()
 
         # Assign all documents with a genre or mark them as unknown permanently
         while len(unknown_genre_docs) > 0:
@@ -362,63 +382,82 @@ class OpenCorporaParser(CorpusParser):
     def document_generator(self):
         """Generator function to iterate over all the documents in the corpus
         that match the subcorpus filters.
-        Returns the document id and xml node for a single document.
+        Returns the document id and the document iterator that emits 'start' and 'end' events positioned at the beginning of the next document.
+        See https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.iterparse
+        for details about the document iterator.
         """
         print("Starting iteration of OpenCorpora.")
         # This is a little inefficient, as it looks at some nodes mutiple times, but hopefully won't be too slow
-        self.determine_genres()
+        self._determine_genres()
         print("Starting iteration through leaf node documents.")
-        for _, elem in ET.iterparse(self.corpus_path, events=("start",)):
-            # Each text tag represents a document or subcorpus
-            # We need to pull out different information depending on which
-            if elem.tag == 'text':
-                elem_id = str(elem.attrib['id'])
-                # Check it's a leaf node which contains text
-                if elem_id in self.doc_ids:
-                    if self.filters is None or (self.doc_genres[elem_id] in self.filters):
-                        self.doc_count+=1
-                        yield elem_id, elem
+        doc_iter = ET.iterparse(self.corpus_path, events=(END, START,))
+        try:
+            while True:
+                event, elem = next(doc_iter)
+                # Each text tag represents a document or subcorpus
+                # We need to pull out different information depending on which
+                if elem.tag==self.DOC_TAG and event==START and self.ID_ATTRIB_KEY in elem.attrib:
+                    elem_id = str(elem.attrib[self.ID_ATTRIB_KEY])
+                    # Check it's a leaf node which contains text
+                    if elem_id in self.doc_ids:
+                        if self.filters is None or (self.doc_genres[elem_id] in self.filters):
+                            self.doc_count+=1
+                            yield elem_id, doc_iter
+                # Tags can be cleared if they aren't valid documents
+                elif event==END:
+                    elem.clear()
+        except StopIteration:
+            print("Iteration through OpenCorpora documents finished.")
 
-            # discard element
-            elem.clear()
-
-    def token_generator(self, document_root):
+    def token_generator(self, doc_iter):
         """Generator fucntion to iterate over all tokens in the document's XML node.
         Return the surface form, the oracle form and the morphological analysis.
 
-        :param document_root: etree xml node
+        :param doc_iter: an iterator positioned at the beginning of the relevant document (last element read was the 'text' start tag for the document)
         """
-        for token_node in document_root.iter(tag="token"):
-            # As with RNC, you can have multiple lemmas and morphology slots for ambiguous forms
-            lemmas = []
-            morph_analyses = []
-            surface_form = token_node.attrib['text']
-            # This naming scheme seems terrible because it is
-            # Each annotation consists of...
-            for annotation in token_node.iter(tag="v"):
-                # ... a lexeme (dictionary form)
-                for lexeme in annotation.iter(tag="l"):
-                    lemmas.append(lexeme.attrib['t'])
-                    # ... and a bunch of grammatical slot information, each in its own tag
-                    # Collect all the grammatical information for a particular lexeme to a list
+        # If this method raises an error, then the XML is malformed, so let's risk the StopIteration exception
+        event, elem = next(doc_iter)
+        # Loop until you reach the end of the document, indicated by 'text' tag end event
+        while not (elem.tag==self.DOC_TAG and event==END):
+            if elem.tag==self.TOKEN_TAG and event==END:
+                # As with RNC, you can have multiple lemmas and morphology slots for ambiguous forms
+                lemmas = []
+                morph_analyses = []
+                surface_form = elem.attrib[self.SURFACE_ATTRIB_KEY]
+                while not (elem.tag==self.TOKEN_TAG and event==END):
+                    event, elem = next(doc_iter) # Should be opening annotation tag
                     morph_slots = []
-                    for slot in lexeme.iter(tag="g"):
-                        morph_slots.append(slot.attrib["v"])
+
+                    # Each annotation consists of...
+                    while not (elem.tag==self.ANNOTATION_TAG and event==END):
+                        # ... a lexeme (dictionary form)
+                        if elem.tag==self.LEXEME_TAG and event ==START:
+                            lemmas.append(elem.attrib[self.LEMMA_ATTRIB_KEY])
+                        # ... and a bunch of grammatical slot information, each in its own tag
+                        elif elem.tag==self.GRAMMAR_TAG and event==START:
+                            morph_slots.append(elem.attrib[self.SLOT_ATTRIB_KEY])
+                        event, elem = next(doc_iter)
+                    # Collect all the grammatical information for a particular lexeme to a list
                     morph_analyses.append(SLOT_SEP.join(morph_slots))
 
-            # Collect up ambiguous forms
-            oracle_form = AMBIGUOUS_ANALYSIS_SEP.join(lemmas)
-            morphology = AMBIGUOUS_ANALYSIS_SEP.join(morph_analyses)
-            self.token_count+=1
-            yield surface_form, oracle_form, morphology
+                # Collect ambiguous forms
+                oracle_form = AMBIGUOUS_ANALYSIS_SEP.join(lemmas)
+                morphology = AMBIGUOUS_ANALYSIS_SEP.join(morph_analyses)
+                self.token_count+=1
+                yield surface_form, oracle_form, morphology
+            event, elem = next(doc_iter)
+
+        # After a document has been parsed, it can be discarded
+        elem.clear()
 
 
 class TIGERCorpusParser(CorpusParser):
-    """
+    """Parses the TIGER v2.2 corpus from a single XML file.
     """
     def document_generator(self):
         # TODO
-        pass
+        for _, elem in ET.iterparse(self.corpus_path, events=("start", )):
+            print(elem)
 
     def token_generator(self, document_root):
         # TODO
@@ -426,7 +465,9 @@ class TIGERCorpusParser(CorpusParser):
 
 
 class CorpusPreprocessor:
-    def __init__(self, corpus_parser, output_dir, use_oracle=True, use_truncation_stemmers = True, truncation_settings = None):
+    # TODO Add min_doc_tokens to set lower bound on document length by number of tokens
+    # TODO Add corpus stats computed by what's kept for Mallet, rather than full original corpus
+    def __init__(self, corpus_parser, output_dir, use_oracle=True, use_truncation_stemmers=True, truncation_settings=None):
         """
         :param corpus_parser: A CorpusParser object
         :param output_dir: The output directory to write all TSV files to
