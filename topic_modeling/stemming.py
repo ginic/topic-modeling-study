@@ -6,9 +6,8 @@ and a TSV with counts of each (token,lemma) pair by author.
 """
 # TODO language options added beyond russian for script behaviour
 # TODO add spaCy lemmatizer option (probably decent for German)
-import abc
+from abc import ABC, abstractmethod
 import argparse
-import csv
 import collections
 import time
 import traceback
@@ -78,7 +77,26 @@ class StemmingError(Exception):
     """Raised when underlying stemmers do not behave as expected"""
     pass
 
-class StanzaLemmatizer:
+
+class AbstractLemmatizer(ABC):
+    """Abstract class for defining behaviour of Stemmers and Lemmatizers
+    """
+    @abstractmethod
+    def lemmatize(self, text):
+        """Tokenizes text, then returns a list of (token, lemma) pairs for tokens in text.
+
+        :param text: str, text to process
+        """
+
+    @abstractmethod
+    def single_term_lemma(self, word):
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        """
+
+
+class StanzaLemmatizer(AbstractLemmatizer):
     """Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
     """
     def __init__(self, keep_punct=False, language='ru'):
@@ -92,11 +110,11 @@ class StanzaLemmatizer:
                                         package=STANZA_PACKAGE)
         self.keep_punct = keep_punct
 
-    def lemmatize(self, text, keep_punct=False):
+    def lemmatize(self, text):
         """Returns list of (word, lemma) pairs for each word in the given text.
         Stanza's sentence breaking and tokenization is used.
 
-        :param text: str, Russian text to process
+        :param text: str, text to process
         """
         result = list()
         doc = self.pipeline(text)
@@ -120,7 +138,7 @@ class StanzaLemmatizer:
 
 
 
-class SnowballStemmer:
+class SnowballStemmer(AbstractLemmatizer):
     """Wrapper around NLTK's implementation of the Snowball Stemmer,
     which uses an improved Porter stemming algorithm.
     http://snowball.tartarus.org/algorithms/russian/stemmer.html
@@ -140,7 +158,6 @@ class SnowballStemmer:
     def lemmatize(self, text):
         """Tokenizes and stems each word in the given text.
         Returns list of (word, lemma) pairs.
-
         :param text: str, Russian text to process
         """
         result = list()
@@ -159,7 +176,7 @@ class SnowballStemmer:
         return self.stemmer.stem(word)
 
 
-class Pymystem3Lemmatizer:
+class Pymystem3Lemmatizer(AbstractLemmatizer):
     """Wrapper around Pymystem3 implementation. It supports Russian, Polish
     and English lemmatization.
     Note that Mystem does its own tokenization.
@@ -225,7 +242,7 @@ class Pymystem3Lemmatizer:
         return result
 
 
-class Pymorphy2Lemmatizer:
+class Pymorphy2Lemmatizer(AbstractLemmatizer):
     """Wrapper around Pymorphy2Lemmatizer. Default tokenizer
     is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
@@ -263,7 +280,7 @@ class Pymorphy2Lemmatizer:
         return self.analyzer.parse(word)[0].normal_form
 
 
-class TruncationStemmer:
+class TruncationStemmer(AbstractLemmatizer):
     """A naive strategy to stem by keeping the first num_chars number of
     characters in a word
     """
@@ -316,13 +333,17 @@ def pick_lemmatizer(choice):
         raise ValueError(f"Stemmer choice '{choice}' is undefined")
 
 def get_language_specific_stemmers(language):
-    """..TODO
+    """Returns a dictionary of {"stemmer_name": instance of AbstractLemmatizer} containing
+    lemmatizers and stemmers appropriate for the given language.
+
+    :param language: str, language name or code
     """
-    if language in ["russian", "ru"]:
+    lang = language.lower()
+    if lang in ["russian", "ru"]:
         stemmers = { PYMYSTEM:Pymystem3Lemmatizer(),
                      SNOWBALL:SnowballStemmer(language='russian')
                     }
-    elif language==["german", "de"]:
+    elif lang in ["german", "de"]:
         stemmers = { SNOWBALL:SnowballStemmer(language='german') }
     else:
         raise ValueError(f"Not a valid language choice: {language}")
