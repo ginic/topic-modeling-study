@@ -145,7 +145,7 @@ class TSVOracleWriter(TSVWriter):
         :param oracle_lemma: str, the lemma assigned in corpus gold standard
         :param morph_analysis: str, the morphological analysis assigned in corpus gold standard
         """
-        if not doc_id == self.current_doc_id:
+        if doc_id != self.current_doc_id:
             self.current_doc_id = doc_id
             self.doc_index += 1
 
@@ -187,20 +187,15 @@ class CorpusParser(ABC):
         Should also increment token_count.
         """
 
-    def get_average_doc_length(self):
-        """Returns the average number of kept tokens per document.
+    def print_corpus_info(self):
+        """Prints the number of documents, number of token counts and average doc length for the corpus read
         """
-        return self.token_count/self.doc_count
-
-    def print_corpus_statistics(self):
-        """Prints the number of documents, number of token counts and average doc length for the corpus
-        """
-        print(self.corpus_name, "corpus statistics:")
+        print(self.corpus_name, "corpus statistics from corpus reader:")
         if self.filters is not None:
             print("\tSubcorpus filters applied:", self.filters)
         print("\tTotal documents:", self.doc_count)
         print("\tTotal tokens:", self.token_count)
-        print("\tAverage doc length by tokens:", self.get_average_doc_length())
+        print("\tAverage doc length by tokens:", self.token_count/self.doc_count)
 
 
 class RussianNationalCorpusParser(CorpusParser):
@@ -606,22 +601,29 @@ class TIGERCorpusParser(CorpusParser):
 class CorpusPreprocessor:
     # TODO Add min_doc_tokens to set lower bound on document length by number of tokens
     # TODO Add corpus stats computed by what's kept for Mallet, rather than full original corpus
-    def __init__(self, corpus_parser, output_dir, use_oracle=True, use_truncation_stemmers=True, truncation_settings=None):
+    def __init__(self, corpus_parser, output_dir, use_oracle=True, use_truncation_stemmers=True, truncation_settings=None, min_doc_length=100):
         """
         :param corpus_parser: A CorpusParser object
         :param output_dir: The output directory to write all TSV files to
         :param use_oracle: True to also output a Mallet TSV file with the oracle lemmas as text
         :param use_truncation_stemmers: True to also use the naive stememrs that truncate to certain number of characters
         :param truncation_settings: A list of ints to truncate to if truncation stemmers are used
+        :param min_doc_length: Minimum length (in tokens) required to keep a document
         """
         self.corpus_parser = corpus_parser
         # Ensure output dir exists
         self.output_dir_path = Path(output_dir)
         self.output_dir_path.mkdir(parents=True)
         self.use_oracle = use_oracle & self.corpus_parser.has_oracle
+        self.docs_written_count = 0 # Total documents written
+        self.total_kept_tokens = 0 # Tokens actually written, doesn't include stops or punctuation
+        self.total_tokens = 0 # All tokens read in, should match corpus parser
+        self.min_doc_length = min_doc_length
+        print(f"Set minimum document length to {self.min_doc_length} tokens")
 
         # This will be used to throw out any tokens containing digits or only punctuation
         self.word_type_pattern = regex.compile(WORD_TYPE_NO_DIGITS_TOKENIZATION)
+        print(f"Set word type regex filter to keep tokens matching: {self.word_type_pattern}")
 
         # Defaults for truncation settings
         self.use_trunaction = use_truncation_stemmers
@@ -645,8 +647,9 @@ class CorpusPreprocessor:
         # Target language directly for stopword lists
         if self.corpus_parser.language=='ru':
             self.stopwords = Russian().Defaults.stop_words
+            # TODO Negation and 'нибудь' variants need to be added
             self.stopwords.update(["со", "ни", "ли", "обо", "ведь", "над",
-                "там", "тут", "где", "даже", "без", "под", "почему", "потому", "тоже", "после", "ничего", "нечего", "очень", "через", "назад", "иногда", "всегда"])
+                "там", "тут", "где", "даже", "без", "под", "почему", "потому", "тоже", "после", "ничего", "нечего", "очень", "через", "назад", "иногда", "всегда", "ну", "пока", "хотя", "часто", "из-за"])
         elif self.corpus_parser.language=='de':
             self.stopwords = German().Defaults.stop_words
         print(f"Loaded {len(self.stopwords)} stopwords from spaCy for language '{self.corpus_parser.language}'")
@@ -719,11 +722,16 @@ class CorpusPreprocessor:
             except Exception as e:
                 print("Error processing document with doc_id:", doc_id)
                 raise e
+
         self.close_all()
         self.validate_document_counts()
-        print(f"{self.output_tsvs[RAW].num_docs} documents processed.")
+        print(f"{self.docs_written_count} documents processed.")
         print(f"Finished processing corpus {self.corpus_parser.corpus_name}.")
-        self.corpus_parser.print_corpus_statistics()
+        # Sanity check that these match
+        print(f"Documents read: {self.corpus_parser.doc_count}")
+        print(f"Documents written: {self.docs_written_count}")
+        self.corpus_parser.print_corpus_info()
+        self.print_corpus_statistics()
 
     def use_token(self, token):
         """Return True if token isn't a stopword, has digits or is only punctuation
@@ -738,26 +746,42 @@ class CorpusPreprocessor:
     def validate_document_counts(self):
         """Raises ValueError if document writer counts are different.
         """
-        doc_count_mapping = set([v.num_docs for v in self.output_tsvs.values()])
-        doc_count_mapping.add(self.oracle_tsv.doc_index + 1)
-        if len(doc_count_mapping) > 1:
-            message = "\n".join([f"{k}:{v.num_docs} docs" for k,v in self.output_tsvs.items()])
-            message += f"\nOracle Gzip: {self.oracle_tsv.doc_index + 1}  docs"
-            raise ValueError("TSV Writers wrote different numbers of documents!\n" + message)
+        doc_count_mapping = [v.num_docs for v in self.output_tsvs.values()]
+        doc_count_mapping.append(self.oracle_tsv.doc_index + 1)
+        for doc_count in doc_count_mapping:
+            if doc_count != self.docs_written_count:
+                message = f"CorpusPreprocessor expects {self.docs_written_count} documents\n"
+                message += "\n".join([f"{k}: {v.num_docs} docs" for k,v in self.output_tsvs.items()])
+                message += f"\nOracle Gzip: {self.oracle_tsv.doc_index + 1}  docs"
+                raise ValueError("TSV Writers wrote different numbers of documents!\n" + message)
+
+    def print_corpus_statistics(self):
+        """Prints the number of documents, number of token counts and average doc length both written and read.
+        """
+        print("Corpus statistics from corpus writer:")
+        print("\tTotal documents:", self.docs_written_count)
+        print("\tTotal tokens (no stopping or token removal):", self.total_tokens)
+        print("\tAverage document length (no stopping or token removal):", self.total_tokens/self.docs_written_count)
+        print("\tTotal tokens after stopping:", self.total_kept_tokens)
+        print("\tAverage doc length after stopping:", self.total_kept_tokens/self.docs_written_count)
+        print("\tTotal tokens removed by stopping or filtering punctuation/digits:", self.total_tokens - self.total_kept_tokens)
 
     def process_document(self, doc_id, doc_root):
         """
         :param doc_id: str, document identifier used by the corpus
         :param doc_root: Root entry point for a document in the corpus. Could be pretty much anything, just pass back to corpus parser
         """
-        # Track the document tokens by stemmer type
+        # Track the document tokens by stemmer type: {processor_name: [list of tokens]}
         processed_docs_map = defaultdict(list)
+        morph_analysis_list = list()
         for token, oracle, morph_analysis in self.corpus_parser.token_generator(doc_root):
+            self.total_tokens+=1
             if self.use_token(token):
+                self.total_kept_tokens+=1
                 processed_docs_map[RAW].append(token)
                 if self.use_oracle:
                     processed_docs_map[ORACLE].append(oracle)
-                    self.oracle_tsv.write_entry(doc_id, token, oracle, morph_analysis)
+                    morph_analysis_list.append(morph_analysis)
                 for stemmer_name, stemmer in self.stemmers.items():
                     lemma = stemmer.single_term_lemma(token).strip()
                     # Don't keep empty strings, fall back to the original token
@@ -767,14 +791,41 @@ class CorpusPreprocessor:
                         processed_docs_map[stemmer_name].append(lemma)
 
         # Validate that all stemmers produce the same number of word forms
-        token_lengths = set(map(len, processed_docs_map.values()))
-        if len(token_lengths) > 1:
-            gather_results = "\n".join([f"STEMMER: {k} LENGTH: {len(v)} TOKENS: {v}" for k,v in processed_docs_map.items()])
-            raise ValueError(f"Some stemmer produced a different length output for doc id {doc_id}:\n" + gather_results)
+        if self.validate_document(doc_id, processed_docs_map):
+            self.docs_written_count+=1
+            # Write to Mallet TSVs
+            for stemmer_name, tokens in processed_docs_map.items():
+                self.output_tsvs[stemmer_name].write_doc(doc_id, "metadata placeholder", " ".join(tokens))
 
-        # If everything went well, write the outputs to TSV
-        for stemmer_name, tokens in processed_docs_map.items():
-            self.output_tsvs[stemmer_name].write_doc(doc_id, "metadata placeholder", " ".join(tokens))
+            # Write to oracle gzip file
+            if self.use_oracle:
+                for token, oracle, morph_analysis in zip(processed_docs_map[RAW], processed_docs_map[ORACLE], morph_analysis_list):
+                    self.oracle_tsv.write_entry(doc_id, token, oracle, morph_analysis)
+
+    def validate_document(self, doc_id, processed_docs_map):
+        """Returns True if the document has the same number of tokens in all processing methods and meets the
+        minimum length requirement. Returns True or False.
+
+        :param doc_id: str, document id in corpus
+        :param processed_docs_map: dict, tracks the document tokens by stemmer type, {processor_name: [list of tokens]}
+        """
+        if len(processed_docs_map)>0:
+            token_lengths = set(map(len, processed_docs_map.values()))
+            if len(token_lengths) > 1:
+                print(processed_docs_map)
+                gather_results = "\n".join([f"STEMMER: {k} LENGTH: {len(v)} TOKENS: {v}" for k,v in processed_docs_map.items()])
+                raise ValueError(f"Some stemmer produced a different length output for doc id {doc_id}:\n{gather_results}")
+
+            # Check minimum document length is met and write outputs to TSV
+            doc_length = token_lengths.pop()
+            if doc_length >= self.min_doc_length:
+                return True
+            else:
+                print(f"Document id {doc_id} excluded, less than {self.min_doc_length} tokens")
+                return False
+        else:
+            print(f"Document id {doc_id} was empty after stemming and filtering")
+            return False
 
 
 def get_corpus_parser(corpus_name, corpus_path, **kwargs):
