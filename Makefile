@@ -8,8 +8,8 @@ TXT_CORPUS := ~/workspace/RussianNovels/corpus
 #TXT_CORPUS := libru_russian/original
 
 # Dir name for corpus & Mallet output
-CORPUS_TARGET := russian_novels
-#CORPUS_TARGET := toy_example
+#CORPUS_TARGET := russian_novels
+CORPUS_TARGET := opencorpora
 
 # Fill in choice of stemmer here: 'pymorphy2', 'pymystem3', 'snowball', 'stanza', 'truncate'
 # Used for both pre (corpus) and post (model state file) processing
@@ -27,7 +27,8 @@ MIN_TERM_FREQ := 5
 # If any questions on maxIDF/maxIDF, check https://github.com/ginic/Mallet/blob/master/src/cc/mallet/classify/tui/Vectors2Vectors.java, lines 142-148
 MIN_IDF := 1.39
 FEATURE_SUFFIX := counts.tsv
-TOKEN_PATTERN := "\p{L}+[\p{P}\p{L}]+\p{L}|\p{L}+"
+#TOKEN_PATTERN := "\p{L}+[\p{P}\p{L}]+\p{L}|\p{L}+"
+TOKEN_PATTERN := "[^\p{Z}]+"
 # Topic modeling experiments with default settings
 MALLET_IMPORT_FLAGS := --keep-sequence --token-regex $(TOKEN_PATTERN)
 NUM_TOPICS := 50
@@ -41,6 +42,8 @@ EXP_COUNT=4
 TOPIC_EXPERIMENT_ID := $(NUM_TOPICS)topics_$(NUM_ITERS)iters_$(EXP_COUNT)
 
 # Preprocessing UTF-8 text files to Mallet TSV format
+# TODO update with new stemming preprocessor
+# TODO Change dependency to the XML corpus
 %.tsv: $(TXT_CORPUS)
 	mkdir -p $(@D)
 	python topic_modeling/preprocessing.py $@ $< --pickle-counts $*_tokens.pickle > $*_preprocessing.out
@@ -91,7 +94,8 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 # Build a topic model and save topic state from the pruned corpus
 # Also produces authorless topic models output for the experiment, post process diagnostics and generate entropy measurements
 # These are probably fragile, don't use with parallel make
-%_$(TOPIC_EXPERIMENT_ID): %_pruned.mallet %_pruned_vocab.txt %.tsv
+# TODO Update with slot entropy using oracle
+%_$(TOPIC_EXPERIMENT_ID): %.mallet %.tsv
 	mkdir -p $@
 	$(eval file_base := $(addsuffix /$(notdir $@),$@))
 	$(eval state := $(addsuffix .gz,$(file_base)))
@@ -101,15 +105,8 @@ $(STEM_CORPUS)/$(STEM_CORPUS).tsv: $(CORPUS_TARGET)/$(CORPUS_TARGET).tsv
 	$(eval top_docs := $(addsuffix _top_docs.txt, $(file_base)))
 	$(eval diagnostics_xml := $(addsuffix _diagnostics.xml,$(file_base)))
 	$(eval diagnostics_tsv := $(addsuffix _diagnostics.tsv,$(file_base)))
-	$(eval author_corrs := $(addsuffix _author_correlation.tsv, $(file_base)))
-	$(eval entropy_metrics := $(addsuffix _entropy.tsv, $(file_base)))
-	$(eval slots := $(addsuffix _slots.tsv, $(file_base)))
-	$(eval lemmas := $(addsuffix _lemmas.tsv, $(file_base)))
-	$(eval pos := $(addsuffix _pos.tsv, $(file_base)))
 	mallet train-topics $(MALLET_TOPIC_FLAGS) --input $< --output-state $(state) --output-model $(output_model) --output-doc-topics $(doc_topics) --output-topic-keys $(topic_keys) --output-topic-docs $(top_docs) --diagnostics-file $(diagnostics_xml)
-	python $(AUTHORLESS_TMS)/topic_author_correlation.py --input $*.tsv --vocab $*_pruned_vocab.txt --input-state $(state) --output $(author_corrs)
 	python topic_modeling/mallet_parser.py diagnostics $(diagnostics_xml) $(diagnostics_tsv)
-	python topic_modeling/mallet_parser.py slot-entropy $(state) $(entropy_metrics) -s $(slots) -l $(lemmas) -p $(pos)
 
 # Create a post-processed Mallet state file and produce experiment metrics from it
 # TODO Clean up copy pasta! *shrug*

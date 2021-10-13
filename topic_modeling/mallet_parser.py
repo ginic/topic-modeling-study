@@ -1,5 +1,7 @@
-"""Functions for dealing with Mallet's diagnostics and state files
+"""Functions for dealing with Mallet's diagnostics and state files.
 """
+# TODO Change to used oracle gzip file for morphology analysis instead of mystem
+# TODO Remove weighted entropy calculations (this is a mystem thing)
 import argparse
 from collections import Counter, defaultdict
 import xml.etree.ElementTree as ET
@@ -8,8 +10,6 @@ import gzip
 import numpy as np
 import pandas as pd
 import pymystem3
-
-from scipy.sparse import lil_matrix
 
 import topic_modeling.stemming as stemming
 

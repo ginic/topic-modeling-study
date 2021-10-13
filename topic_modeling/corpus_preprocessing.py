@@ -20,6 +20,7 @@ Input options:
 Output options:
  - Output directory: To store processed MALLET TSV files for each stemmer and the mophology oracle TSV when this is available.
 """
+# TODO Stopword stuff its own module for clarify
 from abc import ABC, abstractmethod
 import argparse
 from collections import defaultdict
@@ -644,6 +645,8 @@ class CorpusPreprocessor:
         # Target language directly for stopword lists
         if self.corpus_parser.language=='ru':
             self.stopwords = Russian().Defaults.stop_words
+            self.stopwords.update(["со", "ни", "ли", "обо", "ведь", "над",
+                "там", "тут", "где", "даже", "без", "под", "почему", "потому", "тоже", "после", "ничего", "нечего", "очень", "через", "назад", "иногда", "всегда"])
         elif self.corpus_parser.language=='de':
             self.stopwords = German().Defaults.stop_words
         print(f"Loaded {len(self.stopwords)} stopwords from spaCy for language '{self.corpus_parser.language}'")
@@ -726,7 +729,7 @@ class CorpusPreprocessor:
         """Return True if token isn't a stopword, has digits or is only punctuation
         :param token: str, an unstemmed surface form
         """
-        if token in self.stopwords:
+        if token.lower() in self.stopwords:
             return False
         if self.word_type_pattern.fullmatch(token) is None:
             return False
