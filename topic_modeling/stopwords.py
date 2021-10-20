@@ -28,6 +28,6 @@ def get_stopwords(language):
             'хотя',
             'часто', 'через']
         )
-    elif lang in ['de', 'german', 'deutsch']:
+    elif lang in ['de', 'german']:
         stopwords = German().Defaults.stop_words
     return stopwords

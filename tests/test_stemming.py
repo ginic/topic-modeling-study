@@ -1,6 +1,6 @@
 # coding=utf-8
 """Tests for topic_modling.stemming
-No stemmer/lemmatizer will be perfect, but check that each gets at least
+No lemmatizer will be perfect, but check that each gets at least
 half of the lemmas right, just to make sure nothing's totally off the rails.
 """
 import copy
@@ -15,8 +15,8 @@ BULGAKOV_TEST_MULTISENTENCE = ("Однажды весною, в час небы�
 "одетый в летнюю серенькую пару, был маленького роста, упитан, лыс, свою "
 "приличную шляпу пирожком нес в руке")
 
-EXPECTED_LEMMAS = [topic_modeling.stemming.NormalizedToken(t[0], t[1]) for t in
-    [('однажды', 'однажды'), ('весною', 'весна'), ('в','в'),
+
+BULGAKOV_EXPECTED_LEMMAS = [('однажды', 'однажды'), ('весною', 'весна'), ('в','в'),
     ('час', 'час'), ('небывало', 'небывалый'), ('жаркого', 'жаркий'),
     ('заката', 'закат'), ('в', 'в'), ('Москве', 'Москва'), ('на', 'на'),
     ('Патриарших', 'Патриарший'), ('прудах', 'пруд'), ('появились', 'появиться'),
@@ -26,32 +26,41 @@ EXPECTED_LEMMAS = [topic_modeling.stemming.NormalizedToken(t[0], t[1]) for t in
     ('маленького', 'маленький'), ('роста', 'рост'), ('упитан', 'упитанный'),
     ('лыс', 'лысый'), ('свою', 'свой'), ('приличную', 'приличный'),
     ('шляпу', 'шляпа'), ('пирожком', 'пирожок'), ('нес', 'нести'), ('в', 'в'),
-    ('руке', 'рука')]]
+    ('руке', 'рука')]
 
-def helper_test_lemmatizer(lemmatizer):
+GERMAN_TEST_SENTENCE = """Wikipedia ist ein Projekt zum Aufbau einer Enzyklopädie aus freien Inhalten, zu denen du sehr gern beitragen kannst."""
+
+GERMAN_EXPECTED_LEMMAS =  [('Wikipedia','Wikipedia'), ('ist','sein'), ('ein','einen'),
+    ('Projekt','Projekt'), ('zu','zum'), ('Aufbau','Aufbau'), ('einer','einer'),
+    ('Enzyklopädie','Enzyklopädie'), ('aus','aus'), ('freien','frei'),
+    ('Inhalten','Inhalt'), ('zu','zu'), ('denen','der'), ('du','du'), ('sehr','sehr'),
+    ('gern','gern'), ('beitragen','beitragen'), ('kannst','können')]
+
+
+def helper_test_lemmatizer(lemmatizer, text, expected_lemmas, single_word, single_lemma):
     """These lemmatization tests are all executed the same way. Let them pass
     if at least half the lemmas are correct. We want to make sure the
     dictionaries install correctly and that results are in the correct format.
 
     :param lemmatizer: Object with lemmatize(str) function
     """
-    lemma_pairs = lemmatizer.lemmatize(BULGAKOV_TEST_MULTISENTENCE)
-    assert len(lemma_pairs) == len(EXPECTED_LEMMAS)
-    assert lemmatizer.single_term_lemma('руке') == 'рука'
+    lemma_pairs = lemmatizer.lemmatize(text)
+    assert len(lemma_pairs) == len(expected_lemmas)
+    assert lemmatizer.single_term_lemma(single_word) == single_lemma
 
-    # Check correct lemmas
-    expected_copy = copy.deepcopy(EXPECTED_LEMMAS)
+    # Check correct lemmas by removing them
+    expected_copy = copy.deepcopy(expected_lemmas)
     for p in lemma_pairs:
         if p in expected_copy:
             expected_copy.remove(p)
     # pass if at least half of lemmas are right
-    assert len(expected_copy) <= len(EXPECTED_LEMMAS)/2
+    assert len(expected_copy) <= len(expected_lemmas)/2
 
 
 def test_stanza():
     """Test StanzaLemmatizer"""
     lemmatizer = topic_modeling.stemming.StanzaLemmatizer()
-    helper_test_lemmatizer(lemmatizer)
+    helper_test_lemmatizer(lemmatizer, BULGAKOV_TEST_MULTISENTENCE, BULGAKOV_EXPECTED_LEMMAS, 'руке', 'рука')
 
 
 def test_snowball():
@@ -77,14 +86,14 @@ def test_snowball():
 def test_pymystem3():
     """Test Pymystem3Lemmatizer"""
     lemmatizer = topic_modeling.stemming.Pymystem3Lemmatizer()
-    helper_test_lemmatizer(lemmatizer)
+    helper_test_lemmatizer(lemmatizer, BULGAKOV_TEST_MULTISENTENCE, BULGAKOV_EXPECTED_LEMMAS, 'руке', 'рука')
 
 
 def test_pymorphy2():
     """Test Pymorphy2Lemmatizer
     """
     lemmatizer  = topic_modeling.stemming.Pymorphy2Lemmatizer()
-    helper_test_lemmatizer(lemmatizer)
+    helper_test_lemmatizer(lemmatizer, BULGAKOV_TEST_MULTISENTENCE, BULGAKOV_EXPECTED_LEMMAS, 'руке', 'рука')
 
 
 def test_truncation():
@@ -105,10 +114,9 @@ def test_truncation():
     assert lemmatizer.single_term_lemma('руке') == 'руке'
 
 
-
 def test_stem_counter_update():
     stem_counter = topic_modeling.stemming.ByAuthorStemCounts()
-    stem_counter.update('Bulgakov', EXPECTED_LEMMAS)
+    stem_counter.update('Bulgakov', BULGAKOV_EXPECTED_LEMMAS)
     count_pair = topic_modeling.stemming.NormalizedToken('жаркого', 'жаркий')
     stem_counter.update('Bulgakov', [count_pair])
     assert stem_counter.author_map['Bulgakov'][count_pair] == 2
@@ -127,3 +135,15 @@ def test_stem_counter_to_df():
     expected_df = pd.DataFrame({'author':['Bulgakov', 'Bulgakov', 'Tolstoy', 'Tolstoy'], 'token':['жаркого', 'москве', 'жаркого', 'москве'], 'normalized':['жаркий', 'москва', 'жаркий', 'москва'], "count":[2,2,1,1]})
     assert result_df.equals(expected_df)
 
+
+def test_spacy_lemmatizer():
+    """Test spaCy stemmer for German"""
+    lemmatizer = topic_modeling.stemming.SpaCyLemmatizer()
+    helper_test_lemmatizer(lemmatizer, GERMAN_TEST_SENTENCE, GERMAN_EXPECTED_LEMMAS, "siehst", "sehen")
+
+
+def test_stanza_german_lemmatizer():
+    """Check Stanza language switching works"""
+    lemmatizer = topic_modeling.stemming.StanzaLemmatizer(language='de')
+
+    helper_test_lemmatizer(lemmatizer, GERMAN_TEST_SENTENCE, GERMAN_EXPECTED_LEMMAS, "kannst", "können")

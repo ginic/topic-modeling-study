@@ -3,7 +3,7 @@ attrs==21.2.0
 backcall==0.2.0
 blis==0.7.4
 brotlipy==0.7.0
-catalogue==1.0.0
+catalogue>=2.0.4
 certifi==2021.5.30
 cffi==1.14.6
 chardet==3.0.4
@@ -14,6 +14,7 @@ cycler==0.10.0
 cymem==2.0.5
 Cython==0.29.20
 DAWG-Python==0.7.2
+de-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.1.0/de_core_news_lg-3.1.0-py3-none-any.whl # spaCy German model
 decorator==4.4.2
 docopt==0.6.2
 flake8==3.5.0
@@ -86,11 +87,11 @@ seaborn==0.11.1
 setuptools==52.0.0.post20210125
 six==1.15.0
 sklearn==0.0
-spacy==2.3.5
-srsly==1.0.5
+spacy==3.1.*
+srsly>=2.4.1
 # Points to Stanza dev commit with fix for https://github.com/stanfordnlp/stanza/issues/634
 stanza @ git+git://github.com/stanfordnlp/stanza.git@726368644d7b1019825f915fabcfe1e4528e068e
-thinc==7.4.5
+thinc>=8.0.7
 threadpoolctl==2.1.0
 toml==0.10.1
 torch==1.8.0

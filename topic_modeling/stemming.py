@@ -5,7 +5,7 @@ and produced another TSV in Mallet format with appropriately normalized text
 and a TSV with counts of each (token,lemma) pair by author.
 """
 # TODO language options added beyond russian for script behaviour
-# TODO add spaCy lemmatizer option (probably decent for German)
+# TODO Add morphological analyzer class as mixin for stanza, spacy and pymystem
 from abc import ABC, abstractmethod
 import argparse
 import collections
@@ -16,6 +16,7 @@ import nltk.stem.snowball as nltkstem
 import pandas as pd
 import pymorphy2
 import pymystem3
+import spacy
 import stanza
 
 import topic_modeling.tokenization as tokenization
@@ -26,12 +27,14 @@ PYMYSTEM = 'pymystem3'
 SNOWBALL = 'snowball'
 STANZA = 'stanza'
 TRUNCATE = 'truncate'
-STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE]
+SPACY = "spacy"
+STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE, SPACY]
 
-# TODO expand beyond Russian
-# Desired stanza Russian modeling settings
+# Desired stanza modeling settings
 STANZA_SETTINGS = 'tokenize,pos,lemma'
-STANZA_PACKAGE = 'syntagrus'
+# Note regarding German stanza models: The 'gsd' model is the default model, but it expands contractions to multiword tokens
+# (e.g. 'zum' to 'zu dem' rather than 'zu'), which could cause headaches.
+STANZA_PACKAGE = {'ru':'syntagrus', 'de':'hdt'}
 
 # Pymystem keys
 PYMYSTEM_ANALYSIS = 'analysis'
@@ -97,17 +100,18 @@ class AbstractLemmatizer(ABC):
 
 
 class StanzaLemmatizer(AbstractLemmatizer):
-    """Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
+    """Wrapper around the Stanza/Stanford CoreNLP lemmatizer.
     """
     def __init__(self, keep_punct=False, language='ru'):
         """Instantiates Stanza lemmatizer and ensures 'ru' models are downloaded
 
         :param keep_punct: True to keep tokens/lemmas that are just punctuation
+        :param language: str, two letter language code
         """
-        # TODO need to handle other language options
-        stanza.download(language, processors=STANZA_SETTINGS, package=STANZA_PACKAGE)
+        stanza_package = STANZA_PACKAGE[language]
+        stanza.download(language, processors=STANZA_SETTINGS, package=stanza_package)
         self.pipeline = stanza.Pipeline(language,processors=STANZA_SETTINGS,
-                                        package=STANZA_PACKAGE)
+                                        package=stanza_package)
         self.keep_punct = keep_punct
 
     def lemmatize(self, text):
@@ -313,10 +317,41 @@ class TruncationStemmer(AbstractLemmatizer):
         return word[:self.num_chars]
 
 
+class SpaCyLemmatizer(AbstractLemmatizer):
+    """Load a spaCy model for lemmatization
+    """
+    def __init__(self, keep_punct=False, language_model='de_core_news_lg'):
+        """Instantiates spaCy model.
+        This will throw an error if you don't have the language model downloaded.
+        """
+        self.nlp = spacy.load(language_model)
+        self.keep_punct = keep_punct
+
+    def lemmatize(self, text):
+        """Returns a list of (word, lemma) pairs for each word in the given text. Spacy's sentence breaking and tokenization is used.
+
+        :param text: str, text to process
+        """
+        results = []
+        spacy_doc = self.nlp(text)
+        for token in spacy_doc:
+            if not token.is_punct or self.keep_punct:
+                results.append(NormalizedToken(token.text, token.lemma_))
+
+        return results
+
+    def single_term_lemma(self, word):
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        """
+        return self.nlp(word)[0].lemma_
+
+
 def pick_lemmatizer(choice):
     """Returns a lemmatizer object with default settings corresponding to
     user input choice
-
+    .. TODO: currently only returns Russian stemmers
     :param choice: str, defined choice of lemmatizer to use
     """
     if choice==PYMORPHY:
@@ -344,7 +379,9 @@ def get_language_specific_stemmers(language):
                      SNOWBALL:SnowballStemmer(language='russian')
                     }
     elif lang in ["german", "de"]:
-        stemmers = { SNOWBALL:SnowballStemmer(language='german') }
+        stemmers = { SNOWBALL:SnowballStemmer(language='german'),
+                     SPACY:SpaCyLemmatizer()
+                    }
     else:
         raise ValueError(f"Not a valid language choice: {language}")
 
