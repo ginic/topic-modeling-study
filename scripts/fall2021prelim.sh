@@ -1,7 +1,7 @@
 #!/bin/bash
 # Simple script to get some quick experiment results
-corpus="opencorpora"
-stemmers="raw oracle pymystem3 snowball truncate5 truncate6"
+corpus="tiger"
+stemmers="raw oracle snowball truncate5 truncate6"
 for stemmer in $stemmers
 do
     INPUT_TSV="/home/virginia/workspace/topic-modeling-study/${corpus}/${corpus}_$stemmer/${corpus}_$stemmer.tsv"

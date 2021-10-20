@@ -20,7 +20,6 @@ Input options:
 Output options:
  - Output directory: To store processed MALLET TSV files for each stemmer and the mophology oracle TSV when this is available.
 """
-# TODO Stopword stuff its own module for clarify
 from abc import ABC, abstractmethod
 import argparse
 from collections import defaultdict
@@ -35,6 +34,7 @@ from spacy.lang.de import German
 
 import topic_modeling.stemming as stemming
 from topic_modeling.tokenization import WORD_TYPE_NO_DIGITS_TOKENIZATION
+import topic_modeling.stopwords as stopwords
 
 # Corpus name constants
 RNC = "rnc"
@@ -585,9 +585,12 @@ class TIGERCorpusParser(CorpusParser):
         # Morphological analyses aren't ambiguous in TIGER, so we just have to check one per word
         surface_form = token_element.get(self.WORD_ATTRIB)
         pos = token_element.get(self.POS_ATTRIB)
-        # USE comma separation of slots, to match RNC
+        # Use comma separation of slots, to match RNC
         morph = token_element.get(self.MORPH_ATTRIB).replace(".", SLOT_SEP)
         lemma = token_element.get(self.LEMMA_ATTRIB)
+        # Words with unknown or foreign lemmas are marked as '--' or '---', just fall back to the surface form
+        if set(lemma) == {'-'}:
+            lemma = surface_form
         full_morph_analysis = SLOT_SEP.join([pos, morph])
         return surface_form, lemma, full_morph_analysis
 
@@ -621,7 +624,7 @@ class CorpusPreprocessor:
         self.min_doc_length = min_doc_length
         print(f"Set minimum document length to {self.min_doc_length} tokens")
 
-        # This will be used to throw out any tokens containing digits or only punctuation
+        # This will be used to throw out any tokens containing digits or that are only punctuation
         self.word_type_pattern = regex.compile(WORD_TYPE_NO_DIGITS_TOKENIZATION)
         print(f"Set word type regex filter to keep tokens matching: {self.word_type_pattern}")
 
@@ -635,7 +638,7 @@ class CorpusPreprocessor:
         self.set_stopwords()
 
         # All output writers get configured along with stemmers
-        # Will be a TSVOracleWriter if desired
+        # Will be a TSVOracleWriter if use_oracle==True
         self.oracle_tsv = None
         # Stores output tsvs for each stemmer type
         self.output_tsvs = {}
@@ -644,14 +647,7 @@ class CorpusPreprocessor:
     def set_stopwords(self):
         """Set stopwords for this corpus based on language.
         """
-        # Target language directly for stopword lists
-        if self.corpus_parser.language=='ru':
-            self.stopwords = Russian().Defaults.stop_words
-            # TODO Negation and 'нибудь' variants need to be added
-            self.stopwords.update(["со", "ни", "ли", "обо", "ведь", "над",
-                "там", "тут", "где", "даже", "без", "под", "почему", "потому", "тоже", "после", "ничего", "нечего", "очень", "через", "назад", "иногда", "всегда", "ну", "пока", "хотя", "часто", "из-за"])
-        elif self.corpus_parser.language=='de':
-            self.stopwords = German().Defaults.stop_words
+        self.stopwords = stopwords.get_stopwords(self.corpus_parser.language)
         print(f"Loaded {len(self.stopwords)} stopwords from spaCy for language '{self.corpus_parser.language}'")
 
     def get_experiment_basename(self, stemmer_name):
@@ -791,18 +787,18 @@ class CorpusPreprocessor:
                         processed_docs_map[stemmer_name].append(lemma)
 
         # Validate that all stemmers produce the same number of word forms
-        if self.validate_document(doc_id, processed_docs_map):
+        if self.is_valid_document(doc_id, processed_docs_map):
             self.docs_written_count+=1
             # Write to Mallet TSVs
             for stemmer_name, tokens in processed_docs_map.items():
-                self.output_tsvs[stemmer_name].write_doc(doc_id, "metadata placeholder", " ".join(tokens))
+                self.output_tsvs[stemmer_name].write_doc(doc_id, "metadata_placeholder", " ".join(tokens))
 
             # Write to oracle gzip file
             if self.use_oracle:
                 for token, oracle, morph_analysis in zip(processed_docs_map[RAW], processed_docs_map[ORACLE], morph_analysis_list):
                     self.oracle_tsv.write_entry(doc_id, token, oracle, morph_analysis)
 
-    def validate_document(self, doc_id, processed_docs_map):
+    def is_valid_document(self, doc_id, processed_docs_map):
         """Returns True if the document has the same number of tokens in all processing methods and meets the
         minimum length requirement. Returns True or False.
 

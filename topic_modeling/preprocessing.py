@@ -11,6 +11,7 @@ TODO: This assumes everything is written in UTF-8 and skips undecodeable files,
       but we might have to deal with Windows-1251 too eventually
 TODO: Properly choose metadata for column 2 given a metadata input file
 TODO: Author counts map to its own object for cleanness & usability
+TODO: Migrate to corpus_preprocessing in refactor
 """
 import abc
 import argparse
