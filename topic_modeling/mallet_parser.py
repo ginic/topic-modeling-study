@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 import gzip
 
 import numpy as np
+from numpy.core.numeric import full
 import pandas as pd
 import pymystem3
 
@@ -18,6 +19,20 @@ TOPIC="topic"
 TOPIC_ID="id"
 DEFAULT_TOP_N=20
 UNKNOWN="UNKNOWN"
+
+# Column names for dataframes and grouping
+TOPIC_KEY = "topic"
+TERM_KEY = "term"
+SLOT_KEY = "slot"
+LEMMA_KEY = "lemma"
+POS_KEY = "pos"
+DOC_ID_KEY = "doc_id"
+PROB_KEY = "conditional_probability"
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', None)
 
 
 def diagnostics_xml_to_dataframe(xml_path):
@@ -39,7 +54,7 @@ def diagnostics_xml_to_dataframe(xml_path):
 
 def write_header_to_morph_analysis_file(filepath, col_name):
     with open(filepath, 'w') as f:
-        f.write(f"topic\t{col_name}\tweighted_count\tweighted_proportion\tunweighted_count\tunweighted_proportion\n")
+        f.write(f"topic\t{col_name}\tcount\tproportion\n")
 
 def get_stemmed_vocab(vocab_file, stemmer):
     """Read in the vocabulary from a txt file, one element per line.
@@ -89,7 +104,7 @@ def append_topic_morphological_analysis_to_file(topic_id, tsv_file, weighted_mor
             f.write("\t".join([str(x) for x in l]) + "\n")
 
 
-def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None, slot_file=None, lemma_file=None, pos_file=None, top_n=DEFAULT_TOP_N):
+def morphological_entropy_single_topic(topic_term_counts, topic_id=None, slot_file=None, lemma_file=None, pos_file=None, top_n=DEFAULT_TOP_N):
     """For a given topic, returns the slot entropy, number of slots, part of speech entropy, number of part of speech tags, lemma entropy, number of lemmas.
     If an outputdir is specified, the pos tags, slots and lemmas will be written
 
@@ -102,9 +117,6 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
     :param top_n_terms: int, the number of terms to consider for building ratios based on top n word forms in topic
     """
     # TODO This code is so cludgey, really needs to be reorged
-    weighted_slot_counts = defaultdict(float)
-    weighted_lemma_counts = defaultdict(float)
-    weighted_pos_counts = defaultdict(float)
     unweighted_slot_counts = defaultdict(float)
     unweighted_lemma_counts = defaultdict(float)
     unweighted_pos_counts = defaultdict(float)
@@ -127,9 +139,6 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
             unweighted_slot_counts[slot] += count
             unweighted_lemma_counts[lemma] += count
             unweighted_pos_counts[pos] += count
-            weighted_slot_counts[slot] += count
-            weighted_lemma_counts[lemma] += count
-            weighted_pos_counts[pos] += count
             if top_n_counter < top_n:
                 lemmas_in_top_n_terms[lemma] += count
                 slots_in_top_n_terms[slot] += count
@@ -152,25 +161,16 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
                         slots_in_top_n_terms[slot] += count
                         pos_in_top_n_terms[pos] += count
 
-                if weight != 0:
-                    weighted_slot_counts[slot] += weight*count
-                    weighted_lemma_counts[lemma] += weight*count
-                    weighted_pos_counts[pos] += weight*count
 
         top_n_counter += 1
 
     joint_topic_count = sum(topic_term_counts.values())
 
     # Calculates all metrics we want to write to file
-    weighted_slot_entropy = get_entropy_from_counts_dict(weighted_slot_counts, joint_topic_count)
-    weighted_pos_entropy = get_entropy_from_counts_dict(weighted_pos_counts, joint_topic_count)
-    weighted_lemma_entropy = get_entropy_from_counts_dict(weighted_lemma_counts, joint_topic_count)
     unweighted_slot_entropy = get_entropy_from_counts_dict(unweighted_slot_counts, joint_topic_count)
     unweighted_pos_entropy = get_entropy_from_counts_dict(unweighted_pos_counts, joint_topic_count)
     unweighted_lemma_entropy = get_entropy_from_counts_dict(unweighted_lemma_counts, joint_topic_count)
 
-    weighted_ratio_slots_lemmas = len(weighted_slot_counts) / len(weighted_lemma_counts)
-    weighted_ratio_pos_lemmas = len(weighted_pos_counts) / len(weighted_lemma_counts)
     unweighted_ratio_slots_lemmas = len(unweighted_slot_counts) / len(unweighted_lemma_counts)
     unweighted_ratio_pos_lemmas = len(unweighted_pos_counts) / len(unweighted_lemma_counts)
     lemmas_to_forms_top_n = len(lemmas_in_top_n_terms) / top_n
@@ -188,24 +188,17 @@ def morphological_entropy_single_topic(mystem, topic_term_counts, topic_id=None,
             append_topic_morphological_analysis_to_file(topic_id, pos_file, weighted_pos_counts, unweighted_pos_counts, joint_topic_count)
 
 
-    return weighted_slot_entropy, len(weighted_slot_counts), weighted_pos_entropy, len(weighted_pos_counts), weighted_lemma_entropy, len(weighted_lemma_counts), unweighted_slot_entropy, len(unweighted_slot_counts), unweighted_pos_entropy, len(unweighted_pos_counts), unweighted_lemma_entropy, len(unweighted_lemma_counts), weighted_ratio_slots_lemmas, weighted_ratio_pos_lemmas, unweighted_ratio_slots_lemmas, unweighted_ratio_pos_lemmas, lemmas_to_forms_top_n, slots_to_forms_top_n, pos_to_forms_top_n,  top_n_coverage
+    return unweighted_slot_entropy, len(unweighted_slot_counts), unweighted_pos_entropy, len(unweighted_pos_counts), unweighted_lemma_entropy, len(unweighted_lemma_counts), unweighted_ratio_slots_lemmas, unweighted_ratio_pos_lemmas, lemmas_to_forms_top_n, slots_to_forms_top_n, pos_to_forms_top_n,  top_n_coverage
 
 
-def morphological_entropy_all_topics(in_state_file, slot_analysis_file=None, lemma_analysis_file=None, pos_analysis_file=None, top_n=DEFAULT_TOP_N):
-    """Computes entropy by various levels of morphological analysis
+def morphological_entropy_all_topics(in_state_file, oracle_file, ):
+    """Reads in Mallet state file and the oracle file produced from corpus_preprocessing and returns
+    a pandas DataFrame with topic,term,lemma,slot,POS tag as columns from which entropy metrics can be computed.
 
-    :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
-    :param slot_analysis_file: optional file to write detailed slot metrics to
-    :param lemma_analysis_file: optional file to write detailed lemma metrics to
-    :param pos_analysis_file: optional file to write detailed pos metrics to
-    :param top_n: number of top terms of each topic to consider for metrics that use it
+    :param in_state_file: Mallet Gzip file produced by mallet train-topics --output-state option
+    :param oracle_file: Gzipped TSV file produced by corpus_preprocessing.py that contains the gold standard lemma and morphological analysis from the corpus
     :returns: pandas DataFrame
     """
-    # prep detailed analysis files
-    for (f, col) in [(slot_analysis_file, "slot"), (lemma_analysis_file, "lemma"), (pos_analysis_file, "pos")]:
-        if f:
-            write_header_to_morph_analysis_file(f, col)
-
     gzip_reader = gzip.open(in_state_file, mode='rt', encoding='utf-8')
 
     # Burn header
@@ -216,38 +209,103 @@ def morphological_entropy_all_topics(in_state_file, slot_analysis_file=None, lem
     # Burn beta values
     beta_text = gzip_reader.readline()
 
-    topic_term_counts = {i:Counter() for i in range(n_topics)}
+    # Oracle reader should now exactly line up with the Mallet file
+    oracle_reader = gzip.open(oracle_file, mode='rt', encoding='utf-8')
+
+    # Collate everything into lists that are put as columns in a pandas DF
+    topics = []
+    terms = []
+    lemmas = []
+    slots = []
+    parts_of_speech = []
+    doc_ids = []
 
     current_doc_id = -1
-    for i, line in enumerate(gzip_reader):
+    for _, line in enumerate(gzip_reader):
+        _, oracle_doc_idx, surface_form, lemma, morph_analysis = oracle_reader.readline().strip().split()
+        oracle_doc_idx = int(oracle_doc_idx)
+        pos_tag = morph_analysis.split(',')[0]
         fields = line.strip().split()
         doc_id = int(fields[0])
         term = fields[4]
         topic_id = int(fields[5])
+        # Verify document ids are lining up
+        assert oracle_doc_idx == doc_id, f"Mallet file id {doc_id} (term {term}) not lining up with oracle doc id {oracle_doc_idx} (surface form {surface_form})"
+
         if doc_id and doc_id % 1000==0:
             if doc_id != current_doc_id:
                 print("Reading terms for doc:", doc_id)
                 current_doc_id = doc_id
 
-        topic_term_counts[topic_id][term] += 1
+        topics.append(topic_id)
+        terms.append(term)
+        lemmas.append(lemma)
+        slots.append(morph_analysis)
+        parts_of_speech.append(pos_tag)
+        doc_ids.append(doc_id)
 
     gzip_reader.close()
+    oracle_reader.close()
 
-    mystem = pymystem3.Mystem(disambiguation=False)
+    analysis_df = pd.DataFrame.from_dict(
+        {TOPIC_KEY:topics,
+        TERM_KEY:terms,
+        LEMMA_KEY:lemmas,
+        SLOT_KEY:slots,
+        POS_KEY:parts_of_speech,
+        DOC_ID_KEY:doc_ids})
+    return analysis_df
 
-    result = []
+def compute_top_n_metrics(parsed_topic_df, top_n=DEFAULT_TOP_N):
+    """Computes the number of unique slots, lemmas and POS tags in the top_n terms for each topic.
+    Returns the result as a pandas DataFrame with columns: topic, lemma_entropy, slot_entropy, pos_entropy
+    :param parsed_topic_df: Pandas DataFrame containing the topic,term,lemma,slot,pos,doc_ids for each word in the corpus
+    :param top_n:  int, the number of terms to consider for building ratios based on top n word forms in topic
+    """
+    # Count number of grammatical forms in top_n most common terms for each topic
+    term_counts = parsed_topic_df.groupby([TOPIC_KEY, TERM_KEY]).size().reset_index()
+    term_counts.columns = [TOPIC_KEY, TERM_KEY, 'term_count']
+    # Sort by term count, then take top n within each group
+    sort_by_terms = term_counts.groupby(TOPIC_KEY).apply(lambda x: x.sort_values(['term_count'], ascending=False)).reset_index(drop=True)
+    top_terms = sort_by_terms.groupby(TOPIC_KEY).head(top_n)
+    top_terms.to_csv('top_terms.tsv', sep='\t')
+    filter_by_top_terms = pd.merge(top_terms, parsed_topic_df, on=[TOPIC_KEY, TERM_KEY])
+    filter_by_top_terms.to_csv('filter_by_top_terms.tsv', sep='\t')
+    final_top_terms = (filter_by_top_terms.groupby(TOPIC_KEY)
+        .agg({LEMMA_KEY:'nunique', SLOT_KEY:'nunique', POS_KEY:'nunique'})
+        .rename(columns={LEMMA_KEY:f'lemmas_to_top_{top_n}_surface_forms', SLOT_KEY:f'slots_to_top_{top_n}_surface_forms', POS_KEY:f'pos_to_top_{top_n}_surface_forms'})
+        .reset_index()
+    )
+    return final_top_terms
 
-    # Determine P(slot|k) for each topic
-    for topic_id in topic_term_counts:
-        if topic_id % 10 == 0:
-            print("Calculating entropies for topic:", topic_id)
 
-        results_tuple = morphological_entropy_single_topic(mystem, topic_term_counts[topic_id], topic_id, slot_analysis_file, lemma_analysis_file, pos_analysis_file)
-        tmp_list = [topic_id]
-        tmp_list.extend(results_tuple)
-        result.append(tmp_list)
+def compute_entropy_metrics(parsed_topic_df, slot_analysis_file=None, lemma_analysis_file=None, pos_analysis_file=None):
+    """Computes entropies for each topic, writing results to file as desired.
+    Returns the results as a pandas DataFrame with columns: topic, lemmas_to_top_n_surface_forms, slots_to_top_n_surface_forms, pos_to_top_n_surface_forms
 
-    return pd.DataFrame.from_records(result, columns=['topic_id', 'weighted_slot_entropy', 'num_weighted_slots', 'weighted_pos_entropy', 'num_weighted_pos', 'weighted_lemma_entropy', 'num_weighted_lemmas', 'unweighted_slot_entropy', 'num_unweighted_slots', 'unweighted_pos_entropy', 'num_unweighted_pos', 'unweighted_lemma_entropy', 'num_unweighted_lemmas', 'weighted_ratio_slots_to_lemmas', 'weighted_ratio_pos_to_lemmas','unweighted_ratio_slots_to_lemmas', 'unweighted_ratio_pos_to_lemmas', f'lemmas_to_top_{top_n}_surface_forms', f'slots_to_top_{top_n}_surface_forms', f'pos_to_top_{top_n}_surface_forms', f'topic_coverage_by_top_{top_n}_surface_forms'])
+    :param parsed_topic_df: Pandas DataFrame containing the topic,term,lemma,slot,pos,doc_ids for each word in the corpus
+    :param slot_analysis_file: optional file path to write detailed slot metrics to
+    :param lemma_analysis_file: optional file path to write detailed lemma metrics to
+    :param pos_analyais_file: optional file path to write detailed POS metrics to
+    :param top_n:  int, the number of terms to consider for building ratios based on top n word forms in topic
+    """
+    marginal_count_key = "topic_marginal_count"
+    topic_marginal_count = parsed_topic_df.groupby(TOPIC_KEY, as_index=False).size().rename(columns={'size': marginal_count_key})
+    full_results = topic_marginal_count
+
+    # Get joint counts and compute entropy for each type of grammatical information
+    for k, out_file in [(LEMMA_KEY, lemma_analysis_file), (SLOT_KEY, slot_analysis_file), (POS_KEY, pos_analysis_file)]:
+        joint_col = f'{k}_topic_joint_count'
+        joint_counts = parsed_topic_df.groupby([TOPIC_KEY, k], as_index=False).size().sort_values(by='size', ascending=False).rename(columns={'size':joint_col})
+        joined_table_for_entropy = pd.merge(topic_marginal_count, joint_counts, on=TOPIC_KEY)
+        # Compute and add entropy for each topic to full results table
+        joined_table_for_entropy[PROB_KEY] = joined_table_for_entropy[joint_col] / joined_table_for_entropy[marginal_count_key]
+        if out_file:
+            joined_table_for_entropy.to_csv(out_file, sep="\t", index=False, columns = [TOPIC_KEY, k, joint_col, PROB_KEY])
+        topic_entropy = joined_table_for_entropy.groupby(TOPIC_KEY).agg({PROB_KEY: entropy}).rename(columns={PROB_KEY:f'{k}_entropy'})
+        full_results = pd.merge(full_results, topic_entropy, on=TOPIC_KEY)
+
+    return full_results.drop(columns = marginal_count_key)
 
 
 def stem_state_file(in_state_file, out_state_file, stemmer):
@@ -316,8 +374,8 @@ diagnostics_parser = subparsers.add_parser('diagnostics', help="Parses Mallet di
 diagnostics_parser.add_argument('in_xml', help="Mallet diagnostics xml file")
 diagnostics_parser.add_argument('out_tsv', help="Target path for diagnostics in TSV format")
 
-
-state_file_parser = subparsers.add_parser('state-file', help="Work with state files")
+# TODO Expand to support other languages
+state_file_parser = subparsers.add_parser('post-stem', help="Perform post-stemming of a topic model on the Mallet state file")
 state_file_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
 state_file_parser.add_argument('out_gz', help="Desired path for new gzip to be created")
 state_file_parser.add_argument('--lemmatizer', '-l',
@@ -326,6 +384,7 @@ state_file_parser.add_argument('--lemmatizer', '-l',
 
 slot_entropy_parser = subparsers.add_parser('slot-entropy', help="Produces 'slot entropy' values for each topic given a Mallet state file")
 slot_entropy_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
+slot_entropy_parser.add_argument('oracle_gz', help="Gzipped TSV that contains oracle forms and analysis for a corpus. This file is produced by corpus_preprocessing.py")
 slot_entropy_parser.add_argument('out_tsv', help="Target path for morphological entropy metrics in TSV format")
 slot_entropy_parser.add_argument("--slot-analysis", "-s", help="Target path for detailed slot metrics by topic")
 slot_entropy_parser.add_argument("--lemma-analysis", "-l", help="Target path for detailed lemma metrics by topic")
@@ -335,23 +394,29 @@ slot_entropy_parser.add_argument("--pos-analysis", "-p", help="Target path for d
 if __name__ == "__main__":
     args = parser.parse_args()
     subparser_name = args.subparser_name
-    if subparser_name=="state-file":
+    if subparser_name=="post-stem":
+        # TODO post-stemming could also be done using the oracle file
         stemmer = stemming.pick_lemmatizer(args.lemmatizer)
         print("Producing stemmed version of", args.in_gz, "to be written to", args.out_gz)
         topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer)
     elif subparser_name=="slot-entropy":
-        print("Determining morphological slot entropy for topics in", args.in_gz)
-        slot_entropy_df = morphological_entropy_all_topics(args.in_gz, args.slot_analysis, args.lemma_analysis, args.pos_analysis)
+        print("Determining morphological slot entropy for topics in", args.in_gz, "using oracle", args.oracle_gz)
+        topic_analysis_df = morphological_entropy_all_topics(args.in_gz, args.oracle_gz)
+        print("Parsed dataframe from gzips, head:")
+        print(topic_analysis_df.head())
+        entropy_metrics = compute_entropy_metrics(topic_analysis_df, args.slot_analysis, args.lemma_analysis, args.pos_analysis)
+        print("Calculated entropy metrics, head:")
+        print(entropy_metrics.head())
+        top_n_metrics = compute_top_n_metrics(topic_analysis_df)
+        print("Calculated top N term metrics, head:")
+        print(top_n_metrics.head())
+        full_metrics_df = pd.merge(entropy_metrics, top_n_metrics , on=TOPIC_KEY)
         print("Writing resulting dataframe to", args.out_tsv)
-        slot_entropy_df.to_csv(args.out_tsv, sep="\t", index=False)
+        full_metrics_df.to_csv(args.out_tsv, sep="\t", index=False)
 
     else:
         diagnostics_df = diagnostics_xml_to_dataframe(args.in_xml)
         diagnostics_df['negative_coherence'] = - diagnostics_df['coherence']
         # Make sure pandas will print everything
-        pd.set_option('display.max_rows', None)
-        pd.set_option('display.max_columns', None)
-        pd.set_option('display.width', None)
-        pd.set_option('display.max_colwidth', None)
         print(diagnostics_df.describe())
         diagnostics_df.to_csv(args.out_tsv, sep="\t")

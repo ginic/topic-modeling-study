@@ -832,7 +832,7 @@ def get_corpus_parser(corpus_name, corpus_path, **kwargs):
     """
     if corpus_name==RNC:
         # Just keep the news section of RNC for now
-        return RussianNationalCorpusParser(corpus_path[0], filters=['public'])
+        return RussianNationalCorpusParser(corpus_path[0], filters=['public', 'speech'])
     elif corpus_name==OPENCORPORA:
         return OpenCorporaParser(corpus_path[0], filters=['newspaper'])
     elif corpus_name==TIGER:
