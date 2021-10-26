@@ -375,12 +375,14 @@ def get_language_specific_stemmers(language):
     """
     lang = language.lower()
     if lang in ["russian", "ru"]:
-        stemmers = { PYMYSTEM:Pymystem3Lemmatizer(),
-                     SNOWBALL:SnowballStemmer(language='russian')
+        stemmers = { PYMYSTEM: Pymystem3Lemmatizer(),
+                     STANZA: StanzaLemmatizer(language='ru'),
+                     SNOWBALL: SnowballStemmer(language='russian')
                     }
     elif lang in ["german", "de"]:
-        stemmers = { SNOWBALL:SnowballStemmer(language='german'),
-                     SPACY:SpaCyLemmatizer()
+        stemmers = { SNOWBALL :SnowballStemmer(language='german'),
+                     STANZA: StanzaLemmatizer(language='de'),
+                     SPACY: SpaCyLemmatizer()
                     }
     else:
         raise ValueError(f"Not a valid language choice: {language}")
