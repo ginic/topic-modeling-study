@@ -1,9 +1,9 @@
 """Functions for dealing with Mallet's diagnostics and state files.
 """
 # TODO Change to used oracle gzip file for morphology analysis instead of mystem
-# TODO Remove weighted entropy calculations (this is a mystem thing)
 import argparse
 from collections import Counter
+from os import _EnvironCodeFunc
 import xml.etree.ElementTree as ET
 import gzip
 import re
@@ -27,6 +27,9 @@ LEMMA_KEY = "lemma"
 POS_KEY = "pos"
 DOC_ID_KEY = "doc_id"
 PROB_KEY = "conditional_probability"
+
+# Part of speech can be separated by comma or equal, depending on the corpus
+POS_SPLIT_PATTERN = re.compile('[,=]')
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -111,18 +114,12 @@ def parse_morphological_analysis_all_topics(in_state_file, oracle_file, ):
     slots = []
     parts_of_speech = []
     doc_ids = []
-    pos_split_pattern = re.compile('[,=]')
+
 
     current_doc_id = -1
-    for _, line in enumerate(gzip_reader):
-        _, oracle_doc_idx, surface_form, lemma, morph_analysis = oracle_reader.readline().strip().split()
-        oracle_doc_idx = int(oracle_doc_idx)
-        # Part of speech can be separated by comma or equal, depending on the corpus
-        pos_tag = pos_split_pattern.split(morph_analysis)[0]
-        fields = line.strip().split()
-        doc_id = int(fields[0])
-        term = fields[4]
-        topic_id = int(fields[5])
+    for line in enumerate(gzip_reader):
+        _, oracle_doc_idx, surface_form, lemma, morph_analysis, pos_tag = split_oracle_gz_row(oracle_reader.readline())
+        doc_id, _, _, term, topic_id = split_mallet_state_file_row(line)
         # Verify document ids are lining up
         assert oracle_doc_idx == doc_id, f"Mallet file id {doc_id} (term {term}) not lining up with oracle doc id {oracle_doc_idx} (surface form {surface_form})"
 
@@ -165,12 +162,13 @@ def compute_top_n_metrics(parsed_topic_df, top_n=DEFAULT_TOP_N):
     top_terms.to_csv('top_terms.tsv', sep='\t')
     filter_by_top_terms = pd.merge(top_terms, parsed_topic_df, on=[TOPIC_KEY, TERM_KEY])
     filter_by_top_terms.to_csv('filter_by_top_terms.tsv', sep='\t')
-    ratio_function = lambda x: x.nuniuqe() / top_n
     final_top_terms = (filter_by_top_terms.groupby(TOPIC_KEY)
-        .agg({LEMMA_KEY: ratio_function, SLOT_KEY: ratio_function, POS_KEY: ratio_function})
+        .agg({LEMMA_KEY: 'nunique', SLOT_KEY: 'nunique', POS_KEY: 'nunique'})
         .rename(columns={LEMMA_KEY:f'lemmas_to_top_{top_n}_surface_forms', SLOT_KEY:f'slots_to_top_{top_n}_surface_forms', POS_KEY:f'pos_to_top_{top_n}_surface_forms'})
         .reset_index()
     )
+    for k in [f'lemmas_to_top_{top_n}_surface_forms', f'slots_to_top_{top_n}_surface_forms', f'pos_to_top_{top_n}_surface_forms']:
+        final_top_terms[k] = final_top_terms[k] / top_n
     return final_top_terms
 
 
@@ -203,17 +201,40 @@ def compute_entropy_metrics(parsed_topic_df, slot_analysis_file=None, lemma_anal
     return full_results.drop(columns = marginal_count_key)
 
 
-def stem_state_file(in_state_file, out_state_file, stemmer):
+def split_mallet_state_file_row(mallet_tsv_row):
+    """Parses out the appropriate columns from a Mallet Topic Model state file
+    Returns doc_id (as int), source, position, term, topic (as int)
+    :param mallet_tsv_row: str, line from the Mallet state file
+    """
+    fields = mallet_tsv_row.strip().split()
+    doc_id = int(fields[0])
+    source = fields[1]
+    pos = fields[2]
+    term = fields[4]
+    topic = int(fields[5])
+    return doc_id, source, pos, term, topic
+
+
+def split_oracle_gz_row(oracle_row):
+    """Parses out oracle morphological information from a row in the oracle tsv.
+    Returns the document name, document_id (as int, matches Mallet doc_id), surface form of the word, the lemma, the morphological analysis from the corpus and the part of speech tag
+    :param oracle_row: str, line from the oracle TSV
+    """
+    doc_name, oracle_doc_idx, surface_form, lemma, morph_analysis = oracle_row.strip().split()
+    oracle_doc_idx = int(oracle_doc_idx)
+    pos_tag = POS_SPLIT_PATTERN.split(morph_analysis)[0]
+    return doc_name, oracle_doc_idx, surface_form, lemma, morph_analysis, pos_tag
+
+
+def stem_state_file(in_state_file, out_state_file, stemmer=None, oracle_gz=None):
     """Creates a new Mallet .gzip state file by post processing vocab elements with stemming.
 
     :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
     :param out_state_file: Target path for new .gzip file
-    :param vocab_index: map of stemmed vocab item to int index
     :param stemmer: a Stemmer object from topic_modeling.stemming
-    :returns: Map of topic id to a Counter with stemmed terms as keys and counts
-        of the stem for that topic
+    :param oracle_gz: The oracle file produced by corpus_preprocessor.py that is token aligned with the Mallet state files.
+    :returns: Map of topic id to a Counter with stemmed terms as keys and counts of the stem for that topic
     """
-    # TODO Some clean up needed here
     # TODO What do we want to do with topic/term counts?
     vocab_index = {}
     gzip_reader = gzip.open(in_state_file, mode='rt', encoding='utf-8')
@@ -227,24 +248,33 @@ def stem_state_file(in_state_file, out_state_file, stemmer):
     beta_text = gzip_reader.readline()
     gzip_writer.write(beta_text)
 
+    oracle_reader = None
+    if oracle_gz:
+        oracle_reader = gzip.open(oracle_gz, mode='rt', encoding='utf-8')
+
     topic_term_counts = {i:Counter() for i in range(n_topics)}
 
     current_doc_id = -1
-    for i, line in enumerate(gzip_reader):
-        fields = line.strip().split()
-        doc_id = int(fields[0])
-        source = fields[1]
-        pos = fields[2]
-        term = fields[4]
-        topic = int(fields[5])
+    for line in gzip_reader:
+        doc_id, source, pos, term, topic = split_mallet_state_file_row(line)
         if doc_id and doc_id % 1000==0:
             if doc_id != current_doc_id:
                 print("Reading terms for doc:", doc_id)
                 current_doc_id = doc_id
-        stemmed_term = stemmer.single_term_lemma(term)
+        # Using stemmer
+        if stemmer:
+            stemmed_term = stemmer.single_term_lemma(term)
+
+        # Use oracle
+        elif oracle_reader:
+            _, oracle_doc_idx, _, lemma, _, _ = split_oracle_gz_row(oracle_reader.readline())
+            stemmed_term = lemma
+            # Verify document ids are lining up
+            assert oracle_doc_idx == doc_id, f"Mallet file id {doc_id} (term {term}) not lining up with oracle doc id {oracle_doc_idx}"
+
         if stemmed_term != '' and stemmed_term not in vocab_index:
-            stemmed_term_index = len(vocab_index)
-            vocab_index[stemmed_term] = stemmed_term_index
+                stemmed_term_index = len(vocab_index)
+                vocab_index[stemmed_term] = stemmed_term_index
         else:
             stemmed_term_index = vocab_index[stemmed_term]
 
@@ -262,8 +292,6 @@ parser = argparse.ArgumentParser(
     description="Functionality for creating new Mallet state files and reading Mallet diagnostics files."
 )
 subparsers = parser.add_subparsers(dest='subparser_name')
-# TODO better help messages
-
 
 diagnostics_parser = subparsers.add_parser('diagnostics', help="Parses Mallet diagnostics file to CSV and reports overall statistics")
 diagnostics_parser.add_argument('in_xml', help="Mallet diagnostics xml file")
@@ -272,10 +300,15 @@ diagnostics_parser.add_argument('out_tsv', help="Target path for diagnostics in 
 # TODO Expand to support other languages
 state_file_parser = subparsers.add_parser('post-stem', help="Perform post-stemming of a topic model on the Mallet state file")
 state_file_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
-state_file_parser.add_argument('out_gz', help="Desired path for new gzip to be created")
+state_file_parser.add_argument('out_gz', help="Desired path for new gzip for new model state file to be created")
 state_file_parser.add_argument('--lemmatizer', '-l',
     help='Choice of stemmer/lemmatizer',
     choices=stemming.STEMMER_CHOICES)
+
+oracle_post_stem_parser = subparsers.add_parser('oracle-post-stem', help="Perform post stemming of a topic model using the oracle lemmas from a gzip TSV file")
+oracle_post_stem_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
+oracle_post_stem_parser.add_argument('out_gz', help="Desired path for new gzip for new model state file to be created")
+oracle_post_stem_parser.add_argument('oracle_gz', help="Gzipped TSV that contains oracle forms and analysis for a corpus. This file is produced by corpus_preprocessing.py")
 
 slot_entropy_parser = subparsers.add_parser('slot-entropy', help="Produces 'slot entropy' values for each topic given a Mallet state file")
 slot_entropy_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
@@ -293,7 +326,10 @@ if __name__ == "__main__":
         # TODO post-stemming could also be done using the oracle file
         stemmer = stemming.pick_lemmatizer(args.lemmatizer)
         print("Producing stemmed version of", args.in_gz, "to be written to", args.out_gz)
-        topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer)
+        topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer=stemmer)
+    elif subparser_name.name=="oracle-post-stem":
+        print("Producing post-lemmatized version of topic model from the oracle lemmas")
+        stem_state_file(args.in_gz, args.out_gz, oracle_gz=args.oracle_gz)
     elif subparser_name=="slot-entropy":
         print("Determining morphological slot entropy for topics in", args.in_gz, "using oracle", args.oracle_gz)
         topic_analysis_df = parse_morphological_analysis_all_topics(args.in_gz, args.oracle_gz)
