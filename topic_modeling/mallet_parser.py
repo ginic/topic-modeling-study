@@ -3,9 +3,10 @@
 # TODO Change to used oracle gzip file for morphology analysis instead of mystem
 import argparse
 from collections import Counter
-from os import _EnvironCodeFunc
+from typing_extensions import final
 import xml.etree.ElementTree as ET
 import gzip
+import os
 import re
 
 import numpy as np
@@ -26,7 +27,7 @@ SLOT_KEY = "slot"
 LEMMA_KEY = "lemma"
 POS_KEY = "pos"
 DOC_ID_KEY = "doc_id"
-PROB_KEY = "conditional_probability"
+PROB_KEY = "conditional_probability_given_topic"
 
 # Part of speech can be separated by comma or equal, depending on the corpus
 POS_SPLIT_PATTERN = re.compile('[,=]')
@@ -117,7 +118,7 @@ def parse_morphological_analysis_all_topics(in_state_file, oracle_file, ):
 
 
     current_doc_id = -1
-    for line in enumerate(gzip_reader):
+    for line in gzip_reader:
         _, oracle_doc_idx, surface_form, lemma, morph_analysis, pos_tag = split_oracle_gz_row(oracle_reader.readline())
         doc_id, _, _, term, topic_id = split_mallet_state_file_row(line)
         # Verify document ids are lining up
@@ -147,28 +148,73 @@ def parse_morphological_analysis_all_topics(in_state_file, oracle_file, ):
         DOC_ID_KEY:doc_ids})
     return analysis_df
 
-def compute_top_n_metrics(parsed_topic_df, top_n=DEFAULT_TOP_N):
+def compute_top_n_metrics(parsed_topic_df, top_terms_file, top_n=DEFAULT_TOP_N ):
     """Computes the number of unique slots, lemmas and POS tags in the top_n terms for each topic.
-    Returns the result as a pandas DataFrame with columns: topic, lemma_entropy, slot_entropy, pos_entropy
+    Returns the result as a pandas DataFrame with columns: topic, lemmas_to_top_surface_forms, slots_to_top_surface_forms, pos_to_top_surface_forms, top_n_term_set, top_n_lemma_set, lemmas_in_top
     :param parsed_topic_df: Pandas DataFrame containing the topic,term,lemma,slot,pos,doc_ids for each word in the corpus
     :param top_n:  int, the number of terms to consider for building ratios based on top n word forms in topic
     """
-    # Count number of grammatical forms in top_n most common terms for each topic
-    term_counts = parsed_topic_df.groupby([TOPIC_KEY, TERM_KEY]).size().reset_index()
-    term_counts.columns = [TOPIC_KEY, TERM_KEY, 'term_count']
+
+    # Collect top terms for each topic
+    top_n_term_counts = (parsed_topic_df.groupby([TOPIC_KEY, TERM_KEY])
+        .size()
+        .reset_index())
+    top_n_term_counts.columns = [TOPIC_KEY, TERM_KEY, 'term_count']
     # Sort by term count, then take top n within each group
-    sort_by_terms = term_counts.groupby(TOPIC_KEY).apply(lambda x: x.sort_values(['term_count'], ascending=False)).reset_index(drop=True)
-    top_terms = sort_by_terms.groupby(TOPIC_KEY).head(top_n)
-    top_terms.to_csv('top_terms.tsv', sep='\t')
-    filter_by_top_terms = pd.merge(top_terms, parsed_topic_df, on=[TOPIC_KEY, TERM_KEY])
+    top_n_term_counts = (top_n_term_counts.groupby(TOPIC_KEY)
+        .apply(lambda x: x.nlargest(top_n, 'term_count'))
+        .reset_index(drop=True))
+    top_n_term_counts.to_csv(top_terms_file, sep='\t', index=False)
+    print("Top n term counts")
+    print(top_n_term_counts.head())
+
+    print("Top term sets:")
+    top_term_sets = (top_n_term_counts.groupby(TOPIC_KEY)
+        .agg({TERM_KEY: [(f'top_{top_n}_term_set', set)]})
+        .droplevel(0, axis=1))
+    print(top_term_sets.head())
+
+    # Collect top n lemmas for each topic set
+    print("LEMMA COUNTS")
+    top_n_lemma_counts = (parsed_topic_df.groupby([TOPIC_KEY, LEMMA_KEY])
+        .size()
+        .reset_index())
+    top_n_lemma_counts.columns = [TOPIC_KEY, LEMMA_KEY, 'lemma_count']
+    top_n_lemma_counts = (top_n_lemma_counts.groupby(TOPIC_KEY)
+        .apply(lambda x: x.nlargest(top_n, 'lemma_count'))
+        .reset_index(drop=True))
+    print(top_n_lemma_counts.head())
+
+    print("Top N Lemma sets:")
+    top_lemma_sets = (top_n_lemma_counts.groupby(TOPIC_KEY)
+        .agg({LEMMA_KEY: [(f'top_{top_n}_lemma_set', set)]})
+        .droplevel(0, axis=1))
+    print(top_lemma_sets.head())
+
+    # Determine the set of lemmas related to the top n terms
+    filter_by_top_terms = pd.merge(top_n_term_counts, parsed_topic_df, on=[TOPIC_KEY, TERM_KEY])
+    lemmas_in_top_terms = (filter_by_top_terms.groupby(TOPIC_KEY)
+        .agg({LEMMA_KEY: [(f'lemmas_in_{top_n}_terms', set)]})
+        .droplevel(0, axis=1))
+    print("Lemmas in top terms set:")
+    print(lemmas_in_top_terms.head())
+
+    # Collect up metrics about grammatical forms in the top n terms
     filter_by_top_terms.to_csv('filter_by_top_terms.tsv', sep='\t')
     final_top_terms = (filter_by_top_terms.groupby(TOPIC_KEY)
         .agg({LEMMA_KEY: 'nunique', SLOT_KEY: 'nunique', POS_KEY: 'nunique'})
         .rename(columns={LEMMA_KEY:f'lemmas_to_top_{top_n}_surface_forms', SLOT_KEY:f'slots_to_top_{top_n}_surface_forms', POS_KEY:f'pos_to_top_{top_n}_surface_forms'})
-        .reset_index()
-    )
+        .reset_index())
     for k in [f'lemmas_to_top_{top_n}_surface_forms', f'slots_to_top_{top_n}_surface_forms', f'pos_to_top_{top_n}_surface_forms']:
         final_top_terms[k] = final_top_terms[k] / top_n
+
+    # Merge in all term and lemma sets
+    for set_df in [top_term_sets, top_lemma_sets, lemmas_in_top_terms]:
+        final_top_terms = pd.merge(final_top_terms, set_df, on=TOPIC_KEY)
+
+    final_top_terms['top_lemmas_minus_top_term_lemmas'] = final_top_terms[f'top_{top_n}_lemma_set'] - final_top_terms[f'lemmas_in_{top_n}_terms']
+    final_top_terms['num_top_lemmas_excluded_by_top_terms'] = final_top_terms['top_lemmas_minus_top_term_lemmas'].apply(len)
+
     return final_top_terms
 
 
@@ -261,10 +307,10 @@ def stem_state_file(in_state_file, out_state_file, stemmer=None, oracle_gz=None)
             if doc_id != current_doc_id:
                 print("Reading terms for doc:", doc_id)
                 current_doc_id = doc_id
+
         # Using stemmer
         if stemmer:
             stemmed_term = stemmer.single_term_lemma(term)
-
         # Use oracle
         elif oracle_reader:
             _, oracle_doc_idx, _, lemma, _, _ = split_oracle_gz_row(oracle_reader.readline())
@@ -313,10 +359,8 @@ oracle_post_stem_parser.add_argument('oracle_gz', help="Gzipped TSV that contain
 slot_entropy_parser = subparsers.add_parser('slot-entropy', help="Produces 'slot entropy' values for each topic given a Mallet state file")
 slot_entropy_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
 slot_entropy_parser.add_argument('oracle_gz', help="Gzipped TSV that contains oracle forms and analysis for a corpus. This file is produced by corpus_preprocessing.py")
-slot_entropy_parser.add_argument('out_tsv', help="Target path for morphological entropy metrics in TSV format")
-slot_entropy_parser.add_argument("--slot-analysis", "-s", help="Target path for detailed slot metrics by topic")
-slot_entropy_parser.add_argument("--lemma-analysis", "-l", help="Target path for detailed lemma metrics by topic")
-slot_entropy_parser.add_argument("--pos-analysis", "-p", help="Target path for detailed pos metrics by topic")
+slot_entropy_parser.add_argument('out_dir', help="Target directory for output TSVs")
+slot_entropy_parser.add_argument('out_prefix', help="Prefix to add to output TSV files to help track them better")
 
 
 if __name__ == "__main__":
@@ -327,7 +371,7 @@ if __name__ == "__main__":
         stemmer = stemming.pick_lemmatizer(args.lemmatizer)
         print("Producing stemmed version of", args.in_gz, "to be written to", args.out_gz)
         topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer=stemmer)
-    elif subparser_name.name=="oracle-post-stem":
+    elif subparser_name=="oracle-post-stem":
         print("Producing post-lemmatized version of topic model from the oracle lemmas")
         stem_state_file(args.in_gz, args.out_gz, oracle_gz=args.oracle_gz)
     elif subparser_name=="slot-entropy":
@@ -335,16 +379,22 @@ if __name__ == "__main__":
         topic_analysis_df = parse_morphological_analysis_all_topics(args.in_gz, args.oracle_gz)
         print("Parsed dataframe from gzips, head:")
         print(topic_analysis_df.head())
-        entropy_metrics = compute_entropy_metrics(topic_analysis_df, args.slot_analysis, args.lemma_analysis, args.pos_analysis)
+
+        slot_analysis_file = os.path.join(args.out_dir, args.out_prefix + "_topic_slots.tsv")
+        lemma_analysis_file = os.path.join(args.out_dir, args.out_prefix + "_topic_lemmas.tsv")
+        pos_analysis_file = os.path.join(args.out_dir, args.out_prefix + "_topic_pos.tsv")
+        entropy_file = os.path.join(args.out_dir, args.out_prefix + "_entropy_metrics.tsv")
+        entropy_metrics = compute_entropy_metrics(topic_analysis_df, slot_analysis_file, lemma_analysis_file, pos_analysis_file)
         print("Calculated entropy metrics, head:")
         print(entropy_metrics.head())
-        top_n_metrics = compute_top_n_metrics(topic_analysis_df)
+
+        top_terms_csv = os.path.join(args.out_dir, args.out_prefix + "_top_terms.tsv")
+        top_n_metrics = compute_top_n_metrics(topic_analysis_df, top_terms_csv)
         print("Calculated top N term metrics, head:")
         print(top_n_metrics.head())
         full_metrics_df = pd.merge(entropy_metrics, top_n_metrics , on=TOPIC_KEY)
-        print("Writing resulting dataframe to", args.out_tsv)
-        full_metrics_df.to_csv(args.out_tsv, sep="\t", index=False)
-
+        print("Writing resulting dataframe to", entropy_file)
+        full_metrics_df.to_csv(entropy_file, sep="\t", index=False)
     else:
         diagnostics_df = diagnostics_xml_to_dataframe(args.in_xml)
         diagnostics_df['negative_coherence'] = - diagnostics_df['coherence']
