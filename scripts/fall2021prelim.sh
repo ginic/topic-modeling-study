@@ -14,7 +14,7 @@ corpus_root="/home/virginia/workspace/topic-modeling-study/${corpus}"
 oracle_gz="${corpus_root}/${corpus}_oracle/${corpus}_oracleAnalysis.gz"
 
 # Path to the VariationOfInformation.java from https://github.com/xandaschofield/stemmers
-voi_java_prog="/home/virginia/workspace/stemmers/VariationOfInformation"
+voi_java_class_path="/home/virginia/workspace/stemmers"
 
 # Russian stemmers
 #stemmers=(raw oracle pymystem3 snowball stanza truncate5 truncate6)
@@ -81,9 +81,10 @@ do
             for k in {1..9}
             do
                 # Which topic models are you comparing?
+                echo "Computing VOI between $t topics in $modela and $modelb"
                 modela="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}topics_${NUM_ITERS}iters_${j}/${stem_prefix}_state.gz"
                 modelb="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}topics_${NUM_ITERS}iters_${k}/${stem_prefix}_state.gz"
-                java $voi_java_prog $t $modela $modelb >> ${voi_out}/${stemmer}_${j}_${stemmer}_${k}.tsv
+                java -cp $voi_java_class_path VariationOfInformation $t $modela $modelb >> ${voi_out}/${stemmer}_${j}_${stemmer}_${k}.tsv
             done
         done
     done
@@ -101,7 +102,8 @@ do
                     stemmerb=${corpus}_${stemmers[$s2]}
                     modela="${corpus_root}/${stemmera}/${stemmera}_${t}topics_${NUM_ITERS}iters_${i}/${stemmera}_state.gz"
                     modelb="${corpus_root}/${stemmerb}/${stemmerb}_${t}topics_${NUM_ITERS}iters_${j}/${stemmerb}_state.gz"
-                    java $voi_java_prog $t $modela $modelb >> ${voi_out}/${stemmera}_${i}_${stemmerb}_${j}.tsv
+                    echo "Computing VOI between $t topics in $modela and $modelb"
+                    java -cp $voi_java_class_path VariationOfInformation $t $modela $modelb >> ${voi_out}/${stemmera}_${i}_${stemmerb}_${j}.tsv
                 done
             done
         done
