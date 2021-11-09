@@ -1,7 +1,8 @@
 #!/bin/bash
 # Simple script to get train topic models and metric results for a corpus. This assumes you already have converted the corpus to the relevant tsv files using the topic_modeling.corpus_preprocessing script
+# Dependencies: Mallet on PATH, VariationOfInformation.java compiled from https://github.com/xandaschofield/stemmers
 
-# Mallet options remain constant
+# Mallet topic model options remaining constant
 NUM_ITERS=1000
 OPTIMIZE_INTERVAL=20
 OPTIMIZE_BURN_IN=50
@@ -9,17 +10,23 @@ OPTIMIZE_BURN_IN=50
 # Corpus name
 corpus="tiger"
 
-# Where is the output of the corpus_preprocessing.py script?
+# The outputs of the corpus_preprocessing.py script
 corpus_root="/home/virginia/workspace/topic-modeling-study/${corpus}"
 oracle_gz="${corpus_root}/${corpus}_oracle/${corpus}_oracleAnalysis.gz"
 
-# Path to the VariationOfInformation.java from https://github.com/xandaschofield/stemmers
+# Path to dir containing compiled VariationOfInformation xandaschofield/stemmers
 voi_java_class_path="/home/virginia/workspace/stemmers"
 
-# Russian stemmers
-#stemmers=(raw oracle pymystem3 snowball stanza truncate5 truncate6)
-# German stemmers
-stemmers=(raw oracle spacy snowball stanza truncate5 truncate6)
+if [ "$corpus" = "tiger" ]; then
+    # German stemmers
+    stemmers=(raw oracle spacy snowball stanza truncate5 truncate6)
+    echo "Using German stemmers: ${stemmers[@]}"
+else
+    # Russian stemmers
+    stemmers=(raw oracle pymystem3 snowball stanza truncate5 truncate6)
+    echo "Using Russian stemmers: ${stemmers[@]}"
+fi
+
 num_stemmers=${#stemmers[@]}
 
 for stemmer in "${stemmers[@]}"
@@ -33,14 +40,14 @@ do
     token_pattern="[^\p{Z}]+"
     mallet_import_flags="--keep-sequence --token-regex $token_pattern"
 
-    mallet import-file $mallet_import_flags --input $input_tsv --output $corpus_out
+    #mallet import-file $mallet_import_flags --input $input_tsv --output $corpus_out
     echo "Mallet corpus created: $corpus_out"
 done
 
-# Number of topics
+# Number of topics - train models and calculate VOIs
 for t in {50..100..50}
 do
-    voi_out="${corpus_root}/voi_${t}topics"
+    voi_out="${corpus_root}/voi_${t}_topics"
     mkdir $voi_out
     echo "VOIs will be output to $voi_out"
     # Build 10 experiments for each stemmer
@@ -53,7 +60,7 @@ do
             echo "Training stemmer $stemmer model $i with $t topics"
             stem_prefix=${corpus}_${stemmer}
             mallet_corpus=${corpus_root}/${stem_prefix}/${stem_prefix}.mallet
-            model_dir_out="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}topics_${NUM_ITERS}iters_${i}"
+            model_dir_out="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}_topics_${NUM_ITERS}_iters_${i}"
             state_file=$model_dir_out/${stem_prefix}_state.gz
             diag_xml=$model_dir_out/${stem_prefix}_diagnostics.xml
             diag_tsv=$model_dir_out/${stem_prefix}_diagnostics.tsv
@@ -71,20 +78,33 @@ do
 
             echo "Model trained, results in $diag_tsv"
 
-            echo "Calculating entropy metrics"
-            python topic_modeling/mallet_parser.py slot-entropy $state_file $oracle_gz $model_dir_out $stem_prefix
+            #echo "Calculating entropy metrics"
+            #python topic_modeling/mallet_parser.py slot-entropy $state_file $oracle_gz $model_dir_out $stem_prefix
+
+            echo "Post-lemmatizing model to produce lemma level metrics"
+            # Post lemmatize -> State file -> Seq -> Diagnostics with no inference
+            post_lemmatize_prefix="${stem_prefix}_postLemmatized"
+            post_lemmmatize_state_file=$model_dir_out/${post_lemmatize_prefix}_state.gz
+            post_lemmatize_sequence_file=$model_dir_out/${post_lemmatize_prefix}.mallet
+            post_diag_xml=$model_dir_out/${post_lemmatize_prefix}_diagnostics.xml
+            post_diag_tsv=$model_dir_out/${post_lemmatize_prefix}_diagnostics.tsv
+            python topic_modeling/mallet_parser.py oracle-post-lemmatize $state_file $post_lemmmatize_state_file $oracle_gz
+            mallet run cc.mallet.util.StateToInstances --input $post_lemmmatize_state_file --output $post_lemmatize_sequence_file
+            mallet train-topics $mallet_topic_flags --input $post_lemmatize_sequence_file --input-state $post_lemmmatize_state_file --output-model $model_dir_out/${post_lemmatize_prefix}.model --diagnostics-file $post_diag_xml
+            python topic_modeling/mallet_parser.py diagnostics $post_diag_xml $post_diag_tsv
+
         done
 
         # Compute VOIS within the treatment
         for j in {0..8}
         do
-            for k in {1..9}
+            for (( k=$(( $j+ 1 )); k<10; k++ ))
             do
                 # Which topic models are you comparing?
+                modela="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}_topics_${NUM_ITERS}_iters_${j}/${stem_prefix}_state.gz"
+                modelb="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}_topics_${NUM_ITERS}_iters_${k}/${stem_prefix}_state.gz"
                 echo "Computing VOI between $t topics in $modela and $modelb"
-                modela="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}topics_${NUM_ITERS}iters_${j}/${stem_prefix}_state.gz"
-                modelb="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}topics_${NUM_ITERS}iters_${k}/${stem_prefix}_state.gz"
-                java -cp $voi_java_class_path VariationOfInformation $t $modela $modelb >> ${voi_out}/${stemmer}_${j}_${stemmer}_${k}.tsv
+                java -cp $voi_java_class_path VariationOfInformation $t $modela $modelb >> ${voi_out}/${stem_prefix}_${j}_${stem_prefix}_${k}.tsv
             done
         done
     done
@@ -92,7 +112,7 @@ do
     # Compute VOIS between treatments
     for (( s1=0; s1<$num_stemmers-1; s1++ ))
     do
-        for (( s2=0; s2<$num_stemmers; s2++ ))
+        for (( s2=$(( $s1 + 1 )); s2<$num_stemmers; s2++ ))
         do
             for i in {0..9}
             do
@@ -100,8 +120,8 @@ do
                 do
                     stemmera=${corpus}_${stemmers[$s1]}
                     stemmerb=${corpus}_${stemmers[$s2]}
-                    modela="${corpus_root}/${stemmera}/${stemmera}_${t}topics_${NUM_ITERS}iters_${i}/${stemmera}_state.gz"
-                    modelb="${corpus_root}/${stemmerb}/${stemmerb}_${t}topics_${NUM_ITERS}iters_${j}/${stemmerb}_state.gz"
+                    modela="${corpus_root}/${stemmera}/${stemmera}_${t}_topics_${NUM_ITERS}_iters_${i}/${stemmera}_state.gz"
+                    modelb="${corpus_root}/${stemmerb}/${stemmerb}_${t}_topics_${NUM_ITERS}_iters_${j}/${stemmerb}_state.gz"
                     echo "Computing VOI between $t topics in $modela and $modelb"
                     java -cp $voi_java_class_path VariationOfInformation $t $modela $modelb >> ${voi_out}/${stemmera}_${i}_${stemmerb}_${j}.tsv
                 done

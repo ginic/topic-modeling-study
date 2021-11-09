@@ -86,6 +86,13 @@ def get_entropy_from_counts_dict(topic_counts_dict, total_term_count):
     probs = np.array(list(topic_counts_dict.values())) / total_term_count
     return entropy(probs)
 
+def lemma_exclusivity_for_topic():
+    """Lemma Exclusivity is a topic level score which measures the extent to which the top lemmas for a topic do not appear as top lemmas in other topics.
+    For flexibility, you can input a set of lemmas, which allows for using all top n lemmas or restricting to the lemmas which only appear in the top wordforms.
+    See the Mallet docs for a description of exclusivity in general http://mallet.cs.umass.edu/diagnostics.php
+    """
+
+
 
 def parse_morphological_analysis_all_topics(in_state_file, oracle_file, ):
     """Reads in Mallet state file and the oracle file produced from corpus_preprocessing and returns
@@ -212,8 +219,17 @@ def compute_top_n_metrics(parsed_topic_df, top_terms_file, top_n=DEFAULT_TOP_N )
     for set_df in [top_term_sets, top_lemma_sets, lemmas_in_top_terms]:
         final_top_terms = pd.merge(final_top_terms, set_df, on=TOPIC_KEY)
 
-    final_top_terms['top_lemmas_minus_top_term_lemmas'] = final_top_terms[f'top_{top_n}_lemma_set'] - final_top_terms[f'lemmas_in_{top_n}_terms']
+    # Computations using sets
+    final_top_terms['top_lemmas_minus_top_term_lemmas'] = final_top_terms[f'top_{top_n}_lemma_set'] - final_top_terms[f'lemmas_in_top_{top_n}_terms']
+    final_top_terms[f'num_lemmas_in_top_{top_n}_terms'] = final_top_terms[f'lemmas_in_top_{top_n}_terms'].apply(len)
     final_top_terms['num_top_lemmas_excluded_by_top_terms'] = final_top_terms['top_lemmas_minus_top_term_lemmas'].apply(len)
+
+    # Convert sets to space separated lists for
+    join_set = lambda x: " ".join(x)
+    final_top_terms['top_lemmas_minus_top_term_lemmas'] = final_top_terms['top_lemmas_minus_top_term_lemmas'].apply(join_set)
+    final_top_terms[f'lemmas_in_top_{top_n}_terms'] = final_top_terms[f'lemmas_in_top_{top_n}_terms'].apply(join_set)
+    final_top_terms[f'top_{top_n}_lemma_set'] = final_top_terms[f'top_{top_n}_lemma_set'].apply(join_set)
+    final_top_terms[f'top_{top_n}_term_set'] = final_top_terms[f'top_{top_n}_term_set'].apply(join_set)
 
     return final_top_terms
 
@@ -351,7 +367,7 @@ state_file_parser.add_argument('--lemmatizer', '-l',
     help='Choice of stemmer/lemmatizer',
     choices=stemming.STEMMER_CHOICES)
 
-oracle_post_stem_parser = subparsers.add_parser('oracle-post-stem', help="Perform post stemming of a topic model using the oracle lemmas from a gzip TSV file")
+oracle_post_stem_parser = subparsers.add_parser('oracle-post-lemmatize', help="Perform post stemming of a topic model using the oracle lemmas from a gzip TSV file")
 oracle_post_stem_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
 oracle_post_stem_parser.add_argument('out_gz', help="Desired path for new gzip for new model state file to be created")
 oracle_post_stem_parser.add_argument('oracle_gz', help="Gzipped TSV that contains oracle forms and analysis for a corpus. This file is produced by corpus_preprocessing.py")
@@ -371,7 +387,7 @@ if __name__ == "__main__":
         stemmer = stemming.pick_lemmatizer(args.lemmatizer)
         print("Producing stemmed version of", args.in_gz, "to be written to", args.out_gz)
         topic_term_counts = stem_state_file(args.in_gz, args.out_gz, stemmer=stemmer)
-    elif subparser_name=="oracle-post-stem":
+    elif subparser_name=="oracle-post-lemmatize":
         print("Producing post-lemmatized version of topic model from the oracle lemmas")
         stem_state_file(args.in_gz, args.out_gz, oracle_gz=args.oracle_gz)
     elif subparser_name=="slot-entropy":
