@@ -201,7 +201,7 @@ def compute_top_n_metrics(parsed_topic_df, top_terms_file, top_n=DEFAULT_TOP_N )
     # Determine the set of lemmas related to the top n terms
     filter_by_top_terms = pd.merge(top_n_term_counts, parsed_topic_df, on=[TOPIC_KEY, TERM_KEY])
     lemmas_in_top_terms = (filter_by_top_terms.groupby(TOPIC_KEY)
-        .agg({LEMMA_KEY: [(f'lemmas_in_{top_n}_terms', set)]})
+        .agg({LEMMA_KEY: [(f'lemmas_in_top_{top_n}_terms', set)]})
         .droplevel(0, axis=1))
     print("Lemmas in top terms set:")
     print(lemmas_in_top_terms.head())
@@ -221,12 +221,15 @@ def compute_top_n_metrics(parsed_topic_df, top_terms_file, top_n=DEFAULT_TOP_N )
 
     # Computations using sets
     final_top_terms['top_lemmas_minus_top_term_lemmas'] = final_top_terms[f'top_{top_n}_lemma_set'] - final_top_terms[f'lemmas_in_top_{top_n}_terms']
+    final_top_terms['top_term_lemmas_minus_top_lemmas'] = final_top_terms[f'lemmas_in_top_{top_n}_terms'] - final_top_terms[f'top_{top_n}_lemma_set']
     final_top_terms[f'num_lemmas_in_top_{top_n}_terms'] = final_top_terms[f'lemmas_in_top_{top_n}_terms'].apply(len)
     final_top_terms['num_top_lemmas_excluded_by_top_terms'] = final_top_terms['top_lemmas_minus_top_term_lemmas'].apply(len)
+    final_top_terms['num_top_term_lemmas_excluded_by_top_lemmas'] = final_top_terms['top_term_lemmas_minus_top_lemmas'].apply(len)
 
     # Convert sets to space separated lists for
-    join_set = lambda x: " ".join(x)
+    join_set = lambda x: " ".join(x) if len(x)> 0 else ""
     final_top_terms['top_lemmas_minus_top_term_lemmas'] = final_top_terms['top_lemmas_minus_top_term_lemmas'].apply(join_set)
+    final_top_terms['top_term_lemmas_minus_top_lemmas'] = final_top_terms['top_term_lemmas_minus_top_lemmas'].apply(join_set)
     final_top_terms[f'lemmas_in_top_{top_n}_terms'] = final_top_terms[f'lemmas_in_top_{top_n}_terms'].apply(join_set)
     final_top_terms[f'top_{top_n}_lemma_set'] = final_top_terms[f'top_{top_n}_lemma_set'].apply(join_set)
     final_top_terms[f'top_{top_n}_term_set'] = final_top_terms[f'top_{top_n}_term_set'].apply(join_set)

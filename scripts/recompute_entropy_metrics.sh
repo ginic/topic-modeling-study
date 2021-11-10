@@ -13,9 +13,6 @@ corpus="tiger"
 corpus_root="/home/virginia/workspace/topic-modeling-study/${corpus}"
 oracle_gz="${corpus_root}/${corpus}_oracle/${corpus}_oracleAnalysis.gz"
 
-# Path to dir containing compiled VariationOfInformation xandaschofield/stemmers
-voi_java_class_path="/home/virginia/workspace/stemmers"
-
 if [ "$corpus" = "tiger" ]; then
     # German stemmers
     stemmers=(raw oracle spacy snowball stanza truncate5 truncate6)
@@ -36,13 +33,14 @@ do
     for stemmer in ${stemmers[@]}
     do
         echo "Starting $stemmer treatment"
+        stem_prefix=${corpus}_${stemmer}
         for i in {0..9}
         do
             # Define Mallet outputs
             echo "Training stemmer $stemmer model $i with $t topics"
             stem_prefix=${corpus}_${stemmer}
-            mallet_corpus=${corpus_root}/${stem_prefix}/${stem_prefix}.mallet
             model_dir_out="${corpus_root}/${stem_prefix}/${stem_prefix}_${t}_topics_${NUM_ITERS}_iters_${i}"
+            state_file=$model_dir_out/${stem_prefix}_state.gz
 
             echo "Calculating entropy metrics"
             python topic_modeling/mallet_parser.py slot-entropy $state_file $oracle_gz $model_dir_out $stem_prefix
