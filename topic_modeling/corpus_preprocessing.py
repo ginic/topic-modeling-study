@@ -616,7 +616,7 @@ class CorpusPreprocessor:
         self.corpus_parser = corpus_parser
         # Ensure output dir exists
         self.output_dir_path = Path(output_dir)
-        self.output_dir_path.mkdir(parents=True)
+        self.output_dir_path.mkdir(parents=True, exist_ok=True)
         self.use_oracle = use_oracle & self.corpus_parser.has_oracle
         self.docs_written_count = 0 # Total documents written
         self.total_kept_tokens = 0 # Tokens actually written, doesn't include stops or punctuation

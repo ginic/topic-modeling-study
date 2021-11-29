@@ -1,11 +1,11 @@
 #!/bin/bash
-# Corpus name
-corpus="tiger"
+# Corpus name: tiger, rnc, opencorpora
+corpus="opencorpora"
 
 # The outputs of the corpus_preprocessing.py script
 corpus_root="/home/virginia/workspace/topic-modeling-study/${corpus}"
 output_tsv="${corpus_root}/${corpus}_corpus_stats.tsv"
-echo "stemmer\ttoken_count\tword_type_count\ttype_to_token_ratio\tchar_to_token_ratio" > $output_tsv
+echo -e "stemmer\ttoken_count\tword_type_count\ttype_to_token_ratio\tchar_to_token_ratio" > $output_tsv
 
 if [ "$corpus" = "tiger" ]; then
     # German stemmers
@@ -28,5 +28,5 @@ do
     ttr=$(awk "BEGIN {print $word_type/$token_count}")
     char_count=$(cut -f 3 $corpus_tsv | tr -d ' \n' | sort | uniq | wc -m)
     char_to_token=$(awk "BEGIN {print $char_count/$token_count}")
-    echo "$stemmer\t$token_count\t$word_type\t$ttr\t$char_to_token" >> $output_tsv
+    echo -e "$stemmer\t$token_count\t$word_type\t$ttr\t$char_to_token" >> $output_tsv
 done

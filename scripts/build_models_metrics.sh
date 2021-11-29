@@ -8,7 +8,7 @@ OPTIMIZE_INTERVAL=20
 OPTIMIZE_BURN_IN=50
 
 # Corpus name
-corpus="rnc"
+corpus="tiger"
 
 # The outputs of the corpus_preprocessing.py script
 corpus_root="/home/virginia/workspace/topic-modeling-study/${corpus}"
@@ -40,7 +40,7 @@ do
     token_pattern="[^\p{Z}]+"
     mallet_import_flags="--keep-sequence --token-regex $token_pattern"
 
-    #mallet import-file $mallet_import_flags --input $input_tsv --output $corpus_out
+    mallet import-file $mallet_import_flags --input $input_tsv --output $corpus_out
     echo "Mallet corpus created: $corpus_out"
 done
 
@@ -79,7 +79,7 @@ do
             echo "Model trained, results in $diag_tsv"
 
             #echo "Calculating entropy metrics"
-            #python topic_modeling/mallet_parser.py slot-entropy $state_file $oracle_gz $model_dir_out $stem_prefix
+            python topic_modeling/mallet_parser.py slot-entropy $state_file $oracle_gz $model_dir_out $stem_prefix
 
             echo "Post-lemmatizing model to produce lemma level metrics"
             # Post lemmatize -> State file -> Seq -> Diagnostics with no inference

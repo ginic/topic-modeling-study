@@ -7,7 +7,7 @@ OPTIMIZE_INTERVAL=20
 OPTIMIZE_BURN_IN=50
 
 # Corpus name
-corpus="tiger"
+corpus="rnc"
 
 # The outputs of the corpus_preprocessing.py script
 corpus_root="/home/virginia/workspace/topic-modeling-study/${corpus}"

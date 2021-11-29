@@ -86,13 +86,6 @@ def get_entropy_from_counts_dict(topic_counts_dict, total_term_count):
     probs = np.array(list(topic_counts_dict.values())) / total_term_count
     return entropy(probs)
 
-def lemma_exclusivity_for_topic():
-    """Lemma Exclusivity is a topic level score which measures the extent to which the top lemmas for a topic do not appear as top lemmas in other topics.
-    For flexibility, you can input a set of lemmas, which allows for using all top n lemmas or restricting to the lemmas which only appear in the top wordforms.
-    See the Mallet docs for a description of exclusivity in general http://mallet.cs.umass.edu/diagnostics.php
-    """
-
-
 
 def parse_morphological_analysis_all_topics(in_state_file, oracle_file, ):
     """Reads in Mallet state file and the oracle file produced from corpus_preprocessing and returns
@@ -291,13 +284,14 @@ def split_oracle_gz_row(oracle_row):
     return doc_name, oracle_doc_idx, surface_form, lemma, morph_analysis, pos_tag
 
 
-def stem_state_file(in_state_file, out_state_file, stemmer=None, oracle_gz=None):
+def stem_state_file(in_state_file, out_state_file, stemmer=None, oracle_gz=None, use_downcase=True):
     """Creates a new Mallet .gzip state file by post processing vocab elements with stemming.
 
     :param in_state_file: Mallet .gzip file produced by mallet train-topics --output-state option
     :param out_state_file: Target path for new .gzip file
     :param stemmer: a Stemmer object from topic_modeling.stemming
     :param oracle_gz: The oracle file produced by corpus_preprocessor.py that is token aligned with the Mallet state files.
+    :param use_downcase: True to downcase lemmatized/stemmed types before writing them to the Mallet state file. Generally, you want to do this.
     :returns: Map of topic id to a Counter with stemmed terms as keys and counts of the stem for that topic
     """
     # TODO What do we want to do with topic/term counts?
@@ -333,9 +327,13 @@ def stem_state_file(in_state_file, out_state_file, stemmer=None, oracle_gz=None)
         # Use oracle
         elif oracle_reader:
             _, oracle_doc_idx, _, lemma, _, _ = split_oracle_gz_row(oracle_reader.readline())
+            # Models still use downcase version of lemmas
             stemmed_term = lemma
             # Verify document ids are lining up
             assert oracle_doc_idx == doc_id, f"Mallet file id {doc_id} (term {term}) not lining up with oracle doc id {oracle_doc_idx}"
+
+        if use_downcase:
+            stemmed_term = stemmed_term.lower()
 
         if stemmed_term != '' and stemmed_term not in vocab_index:
                 stemmed_term_index = len(vocab_index)
