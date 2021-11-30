@@ -273,14 +273,18 @@ def split_mallet_state_file_row(mallet_tsv_row):
     return doc_id, source, pos, term, topic
 
 
-def split_oracle_gz_row(oracle_row):
+def split_oracle_gz_row(oracle_row, use_downcase=True):
     """Parses out oracle morphological information from a row in the oracle tsv.
     Returns the document name, document_id (as int, matches Mallet doc_id), surface form of the word, the lemma, the morphological analysis from the corpus and the part of speech tag
     :param oracle_row: str, line from the oracle TSV
+    :param use_downcase: True to downcase the surface form and lemma
     """
     doc_name, oracle_doc_idx, surface_form, lemma, morph_analysis = oracle_row.strip().split()
     oracle_doc_idx = int(oracle_doc_idx)
     pos_tag = POS_SPLIT_PATTERN.split(morph_analysis)[0]
+    if use_downcase:
+        lemma = lemma.lower()
+        surface_form = surface_form.lower()
     return doc_name, oracle_doc_idx, surface_form, lemma, morph_analysis, pos_tag
 
 
