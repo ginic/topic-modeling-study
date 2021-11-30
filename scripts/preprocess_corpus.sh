@@ -1,11 +1,15 @@
 #!/bin/bash
 # Convenience wrapper around stemming pre-processor.
 
-# Corpus name
-corpus="tiger"
+# Corpus name & original format corpus location
+#corpus="tiger"
+#corpus_source="/home/virginia/workspace/tiger_corpus2.2/tiger_release_aug07.corrected.16012013.xml /home/virginia/workspace/tiger_corpus2.2/TIGER2.2.doc/documents.tsv"
 
-# Original format corpus location
-corpus_source="/home/virginia/workspace/tiger_corpus2.2/tiger_release_aug07.corrected.16012013.xml /home/virginia/workspace/tiger_corpus2.2/TIGER2.2.doc/documents.tsv"
+#corpus="rnc"
+#corpus_source="/home/virginia/workspace/RNC_million"
+
+corpus="opencorpora"
+corpus_source="/home/virginia/workspace/opencorpora/annot.opcorpora.xml"
 
 # The outputs of the corpus_preprocessing.py script
 corpus_root="/home/virginia/workspace/topic-modeling-study/${corpus}"
