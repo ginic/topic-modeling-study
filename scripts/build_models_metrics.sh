@@ -90,7 +90,7 @@ do
             post_diag_tsv=$model_dir_out/${post_lemmatize_prefix}_diagnostics.tsv
             python topic_modeling/mallet_parser.py oracle-post-lemmatize $state_file $post_lemmmatize_state_file $oracle_gz
             mallet run cc.mallet.util.StateToInstances --input $post_lemmmatize_state_file --output $post_lemmatize_sequence_file
-            mallet train-topics $mallet_topic_flags --input $post_lemmatize_sequence_file --input-state $post_lemmmatize_state_file --output-model $model_dir_out/${post_lemmatize_prefix}.model --diagnostics-file $post_diag_xml
+            mallet train-topics $mallet_topic_flags --input $post_lemmatize_sequence_file --input-state $post_lemmmatize_state_file --no-inference  true --output-model $model_dir_out/${post_lemmatize_prefix}.model --diagnostics-file $post_diag_xml
             python topic_modeling/mallet_parser.py diagnostics $post_diag_xml $post_diag_tsv
 
         done
