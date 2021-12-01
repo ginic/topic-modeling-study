@@ -2,8 +2,11 @@
 Independent study on topic modeling with a focus on investigating non-English literary corpora.
 
 # Dependencies for experiments
+- python3 and your choice of virtual environment tool
 - [Mallet](http://mallet.cs.umass.edu) should be installed and available in the path. It must be the latest version from Github, not the version from the website.
-- [Make](https://en.wikipedia.org/wiki/Make_(software)) to easily build corpus and topic experiments (tested with GNU Make)
+- [Java 8](https://openjdk.java.net/install/), OpenJDK is fine.
+- [Variation of Information Java program](https://github.com/ginic/stemmers/blob/master/VariationOfInformation.java) should be downloaded and compiled (using javac). Include the class path to this program in `scripts/build_models_metrics.sh`.
+- [wc](https://en.wikipedia.org/wiki/Wc_(Unix)) and [awk](https://en.wikipedia.org/wiki/AWK) for scripts that compute corpus stats.
 
 # Installation for python library
 TODO: Nice setup.py configuration.

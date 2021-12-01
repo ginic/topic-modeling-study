@@ -19,4 +19,4 @@ then
 	mkdir -p $corpus_root
 fi
 
-python -u -m topic_modeling.corpus_preprocessing --corpus_in $corpus_source --output_dir $corpus_root --corpus_name $corpus | tee $corpus_root/$corpus.out
+python -u -m topic_modeling.corpus_preprocessing --corpus_in $corpus_source --output_dir $corpus_root --corpus_name $corpus > $corpus_root/$corpus.out
