@@ -2,7 +2,7 @@
 """
 # TODO Change to used oracle gzip file for morphology analysis instead of mystem
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 from typing_extensions import final
 import xml.etree.ElementTree as ET
 import gzip
@@ -38,6 +38,27 @@ pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
 
 
+def get_corpus_analysis_counts(oracle_file):
+    """Computes joint counts between word type, lemmas and word type, slots and word type, pos tag.
+    Returns results as tuples of (surface_form_index, analysis_index, np array freq matrix).
+    :param oracle_file: Path to the oracleAnalysis gzip file
+    """
+    oracle_reader = gzip.open(oracle_file, mode='rt', encoding='utf-8')
+    surface_form_counter = Counter()
+    lemma_counter = Counter()
+    slot_counter = Counter()
+    pos_counter = Counter()
+
+    for line in oracle_reader:
+        _, _, surface_form, lemma, morph_analysis, pos_tag = split_oracle_gz_row(line)
+        surface_form_counter[surface_form] += 1
+        lemma_counter[lemma] += 1
+        slot_counter[morph_analysis] += 1
+        pos_counter[pos_tag] += 1
+
+    return surface_form_counter, lemma_counter, slot_counter, pos_counter
+
+
 def diagnostics_xml_to_dataframe(xml_path):
     """Returns a pandas dataframe with the
     :param xml_path: Path to a Mallet diagnostics file
@@ -54,6 +75,7 @@ def diagnostics_xml_to_dataframe(xml_path):
         topic_metrics.append(attributes)
 
     return pd.DataFrame.from_records(topic_metrics, index=TOPIC_ID)
+
 
 def get_stemmed_vocab(vocab_file, stemmer):
     """Read in the vocabulary from a txt file, one element per line.
@@ -72,10 +94,12 @@ def get_stemmed_vocab(vocab_file, stemmer):
             vocab.append(lemma)
     return vocab, vocab_index
 
+
 def entropy(probabilities):
     """Returns the entropy given a list of probabilities for n elements
     """
     return -np.sum(probabilities * np.log2(probabilities))
+
 
 def get_entropy_from_counts_dict(topic_counts_dict, total_term_count):
     """Calculates probabilities and entropy from a dict of counts for a term/lemma/pos/slot
@@ -87,7 +111,7 @@ def get_entropy_from_counts_dict(topic_counts_dict, total_term_count):
     return entropy(probs)
 
 
-def parse_morphological_analysis_all_topics(in_state_file, oracle_file, ):
+def parse_morphological_analysis_all_topics(in_state_file, oracle_file):
     """Reads in Mallet state file and the oracle file produced from corpus_preprocessing and returns
     a pandas DataFrame with topic,term,lemma,slot,POS tag as columns from which entropy metrics can be computed.
 
@@ -241,16 +265,19 @@ def compute_entropy_metrics(parsed_topic_df, slot_analysis_file=None, lemma_anal
     :param top_n:  int, the number of terms to consider for building ratios based on top n word forms in topic
     """
     marginal_count_key = "topic_marginal_count"
-    topic_marginal_count = parsed_topic_df.groupby(TOPIC_KEY, as_index=False).size().rename(columns={'size': marginal_count_key})
+    topic_marginal_count = parsed_topic_df.groupby(TOPIC_KEY, as_index=False).count().rename(columns={TERM_KEY: marginal_count_key})
+    topic_marginal_count = topic_marginal_count[[TOPIC_KEY, marginal_count_key]]
     full_results = topic_marginal_count
 
     # Get joint counts and compute entropy for each type of grammatical information
     for k, out_file in [(LEMMA_KEY, lemma_analysis_file), (SLOT_KEY, slot_analysis_file), (POS_KEY, pos_analysis_file)]:
         joint_col = f'{k}_topic_joint_count'
-        joint_counts = parsed_topic_df.groupby([TOPIC_KEY, k], as_index=False).size().sort_values(by='size', ascending=False).rename(columns={'size':joint_col})
+        joint_counts = parsed_topic_df.groupby([TOPIC_KEY, k], as_index=False).count()[[TOPIC_KEY, k, TERM_KEY]]
+        joint_counts = joint_counts.rename(columns={TERM_KEY:joint_col}).sort_values(by=[TOPIC, joint_col], ascending=[True, False])
         joined_table_for_entropy = pd.merge(topic_marginal_count, joint_counts, on=TOPIC_KEY)
         # Compute and add entropy for each topic to full results table
         joined_table_for_entropy[PROB_KEY] = joined_table_for_entropy[joint_col] / joined_table_for_entropy[marginal_count_key]
+
         if out_file:
             joined_table_for_entropy.to_csv(out_file, sep="\t", index=False, columns = [TOPIC_KEY, k, joint_col, PROB_KEY])
         topic_entropy = joined_table_for_entropy.groupby(TOPIC_KEY).agg({PROB_KEY: entropy}).rename(columns={PROB_KEY:f'{k}_entropy'})
@@ -330,7 +357,7 @@ def stem_state_file(in_state_file, out_state_file, stemmer=None, oracle_gz=None,
             stemmed_term = stemmer.single_term_lemma(term)
         # Use oracle
         elif oracle_reader:
-            _, oracle_doc_idx, _, lemma, _, _ = split_oracle_gz_row(oracle_reader.readline())
+            _, oracle_doc_idx, _, lemma, _, _ = split_oracle_gz_row(oracle_reader.readline(), use_downcase)
             # Models still use downcase version of lemmas
             stemmed_term = lemma
             # Verify document ids are lining up
