@@ -37,6 +37,43 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
 
+def get_state_file_from_surface_forms(raw_state_file, treatment_state_file, output_state_file):
+    """Creates a state file for a topic model that uses the same topic allocations as the treatment model, but the surface forms from the raw state file as terms/vocabulary. The raw state file and treatment state file must underlyingly have the same documents and tokens, but vocabularly may differ due to stemming/lemmatization.
+
+    This is used for mapping back to surface forms in order to compute coherence using the same untreated vocabulary.
+
+    :param raw_state_file: path to the state file using the terms you want to have in output
+    :param treatment_state_file: path to state file for model weights and allocations you want in output
+    :param output_state_file: path to desired output state file
+    """
+    raw_reader = gzip.open(raw_state_file, mode='rt', encoding='utf-8')
+    treatment_reader = gzip.open(treatment_state_file, mode='rt', encoding='utf-8')
+
+    # skip headers and weights in raw model - 3 lines
+    for i in range(3):
+     _ = raw_reader.readline()
+
+    # write headers and weights from treatment model
+    gzip_writer = gzip.open(output_state_file, mode='wt', encoding='utf-8')
+    header = treatment_reader.readline()
+    gzip_writer.write(header)
+    alpha_text = treatment_reader.readline()
+    gzip_writer.write(alpha_text)
+    beta_text = treatment_reader.readline()
+    gzip_writer.write(alpha_text)
+
+    # The treament and raw state file should be the same length
+    for treatment_line in treatment_reader.readline():
+        # topic allocation comes from the treatment model, everything else from the raw
+        _, _, _, _, _, treatment_topic = split_mallet_state_file_row(treatment_line)
+        doc_id, source, pos, term_idx, term, _ = split_mallet_state_file_row(raw_reader.readline())
+        output_result = " ".join([str(doc_id), source, pos, term_idx, term, treatment_topic])
+        gzip_writer.write(output_result + "\n")
+
+    treatment_reader.close()
+    raw_reader.close()
+    gzip_writer.close()
+
 
 def get_corpus_analysis_counts(oracle_file):
     """Computes joint counts between word type, lemmas and word type, slots and word type, pos tag.
@@ -144,7 +181,7 @@ def parse_morphological_analysis_all_topics(in_state_file, oracle_file):
     current_doc_id = -1
     for line in gzip_reader:
         _, oracle_doc_idx, surface_form, lemma, morph_analysis, pos_tag = split_oracle_gz_row(oracle_reader.readline())
-        doc_id, _, _, term, topic_id = split_mallet_state_file_row(line)
+        doc_id, _, _, _, term, topic_id = split_mallet_state_file_row(line)
         # Verify document ids are lining up
         assert oracle_doc_idx == doc_id, f"Mallet file id {doc_id} (term {term}) not lining up with oracle doc id {oracle_doc_idx} (surface form {surface_form})"
 
@@ -295,9 +332,10 @@ def split_mallet_state_file_row(mallet_tsv_row):
     doc_id = int(fields[0])
     source = fields[1]
     pos = fields[2]
+    term_idx = fields[3]
     term = fields[4]
     topic = int(fields[5])
-    return doc_id, source, pos, term, topic
+    return doc_id, source, pos, term_idx, term, topic
 
 
 def split_oracle_gz_row(oracle_row, use_downcase=True):
@@ -346,7 +384,7 @@ def stem_state_file(in_state_file, out_state_file, stemmer=None, oracle_gz=None,
 
     current_doc_id = -1
     for line in gzip_reader:
-        doc_id, source, pos, term, topic = split_mallet_state_file_row(line)
+        doc_id, source, pos, _, term, topic = split_mallet_state_file_row(line)
         if doc_id and doc_id % 1000==0:
             if doc_id != current_doc_id:
                 print("Reading terms for doc:", doc_id)
@@ -391,7 +429,6 @@ diagnostics_parser = subparsers.add_parser('diagnostics', help="Parses Mallet di
 diagnostics_parser.add_argument('in_xml', help="Mallet diagnostics xml file")
 diagnostics_parser.add_argument('out_tsv', help="Target path for diagnostics in TSV format")
 
-# TODO Expand to support other languages
 state_file_parser = subparsers.add_parser('post-stem', help="Perform post-stemming of a topic model on the Mallet state file")
 state_file_parser.add_argument('in_gz', help="Input gzip file, an existing state file")
 state_file_parser.add_argument('out_gz', help="Desired path for new gzip for new model state file to be created")
@@ -409,6 +446,12 @@ slot_entropy_parser.add_argument('in_gz', help="Input gzip file, an existing sta
 slot_entropy_parser.add_argument('oracle_gz', help="Gzipped TSV that contains oracle forms and analysis for a corpus. This file is produced by corpus_preprocessing.py")
 slot_entropy_parser.add_argument('out_dir', help="Target directory for output TSVs")
 slot_entropy_parser.add_argument('out_prefix', help="Prefix to add to output TSV files to help track them better")
+
+unmap_stemming_parser = subparsers.add_parser('unmap-stemmed-state', help="Map back to original raw terms in order to compute coherence metrics using the same vocabulary")
+unmap_stemming_parser.add_argument('raw_gz', help="Gzip file for the Mallet state file to use terms/vocabulary from")
+unmap_stemming_parser.add_argument('treatment_gz', help="Gzip file for Mallet state file from which to use topic assignments for tokens")
+unmap_stemming_parser.add_argument('output_gz', help="Path to thenew gzip Mallet state file that will be created")
+
 
 
 if __name__ == "__main__":
@@ -443,6 +486,9 @@ if __name__ == "__main__":
         full_metrics_df = pd.merge(entropy_metrics, top_n_metrics , on=TOPIC_KEY)
         print("Writing resulting dataframe to", entropy_file)
         full_metrics_df.to_csv(entropy_file, sep="\t", index=False)
+    elif subparser_name=="unmap-stemmed-state":
+        get_state_file_from_surface_forms(args.raw_gz, args.treatment_gz, args.output_gz)
+
     else:
         diagnostics_df = diagnostics_xml_to_dataframe(args.in_xml)
         diagnostics_df['negative_coherence'] = - diagnostics_df['coherence']
