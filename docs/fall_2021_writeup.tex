@@ -48,7 +48,7 @@
 % smaller than 5cm (the original size); we will check this
 % in the camera-ready version and ask you to change it back.
 
-\title{Quantifying Morphology in Latent Dirichlet Analysis Topic Models}
+\title{Quantifying Morphology in LDA Topic Models}
 
 \author{Virginia Partridge \\
   University of Massachusetts Amherst\\
@@ -71,17 +71,59 @@ Latent Dirichlet allocation (LDA) is a widely adopted approach for unsupervised 
 
 However, what happens when words in this bag-of-words approach are themselves are complex? Stemming and lemmatization treatments are typical text preprocessing steps for topic modeling, even for English, which has relatively little inflectional morphology, but there is a lack of empirical evidence that these treatments improve the models from the perspective of human interpretability or quantitative measures of topic quality \cite{schofield-mimno-2016-comparing}. To understand the effects of these treatments on languages with more inflectional morphology, we train topic models on the German TIGER corpus\footnote{\url{https://www.ims.uni-stuttgart.de/en/research/resources/corpora/tiger/}} \cite{Brants2004TIGERLI} and the Russian National corpus\footnote{\url{https://ruscorpora.ru/old/en/corpora-morph.html}} (RNC) \cite{Apresjan2006ASA}. These corpora have high quality morphological and syntactic annotations, which allow for analysis based on gold standard morphological analyses and lemmatization.
 
-Following Schofield and Mimno's work, we use Variation of information (VOI) to show how stemming and lemmatization change topic assignments under various pre-processing treatments. The stability of topic assignments under each treatment show how pre-processing affects experimental reproducibility. Additionally, we adapt measures of morphological complexity to analyzing LDA topics produced by Gibbs sampling in order to quantify the ways in which inflectional morphology influence topic models and identify topics where morphology most strongly complicates interpretability. So long as reliable morphological analyses are available, these methods can be applied cross-linguistically, which we demonstrate using topic models for TIGER and RNC. We also find evidence that stemming in pre-processing hurts topic stability, but
+There are many ways which choices about stemming or lemmatization could affect the quality and interpretability of topic models and these effects are not mutually exclusive. First, in the absence of any morphological treatment, a topic model may learn to concentrate all the surface forms of a particular lexeme in a single topic. A topic identified by repeated forms of the same lexeme is not likely to be useful to end users, making it a good candidate for post-stemming to reveal more lexemes and therefore more context for the topic. Alternatively, a topic could encompass many lexemes, but few grammatical forms. Our hypothesis is that this may occur when a documents share stylometric similarities, such as the top keywords for a topic with dialogue-heavy documents being first-person and second-person verb forms. Applying stemming or lemmatization in pre-processing would prevent the formation of such a topic and applying it in post-processing would obscure the stylistic information encoded by the grammatical form.
 
+To examine the extent to which these issues arise, we adapt measures of morphological complexity to analyzing LDA topics produced by Gibbs sampling, quantifying the ways in which inflectional morphology influence topic models and identifying topics where morphology complicates interpretability. So long as reliable morphological analyses are available, these methods can be applied cross-linguistically, which we demonstrate using topic models for TIGER and RNC.
+
+Pre-processing treatments could also hurt the quality of topic models in terms of reproducibility or topics' semantic coherence. Following Schofield and Mimno's work, we use topic coherence as a stand-in for human judgements of topic quality \cite{mimno2011optimizing} and  Variation of information (VOI) \cite{Meila2003ComparingCB} to show how stemming and lemmatization change tokens' topic assignments under various pre-processing treatments over multiple experiments.
+
+% TODO some brief summary of conclusions
 
 \section{Related Work}
-The proposal for applying stemming in post-processing comes from work comparing the effects of various stemming approaches on English \cite{schofield-mimno-2016-comparing}. After comparing the relative strengths, qualitative and quantitative impacts of rule-based and context-based stemmers for English, it was concluded that stemming in pre-processing does not empirically improve LDA topic models and may hurt topic stability. Post-processing may still be valuable from the perspective of topic interpretability, avoiding repeating different surface forms of the same lexeme in topics' key word lists and presenting users with concise results.
+The proposal for applying stemming in post-processing comes from work comparing the effects of various stemming approaches on English evaluated on likelihood of a held-out test corpus, topic coherence and clustering consistency with VOI \cite{schofield-mimno-2016-comparing}. After comparing the relative strengths, qualitative and quantitative impacts of rule-based and context-based stemmers for English, it was concluded that stemming in pre-processing does not empirically improve LDA topic models and may hurt topic stability. Post-processing is still be valuable from the perspective of topic interpretability, avoiding repeating different surface forms of the same lexeme in topics' key word lists and presenting users with concise results.
 
-Probabilistic topic modeling has been applied on Russian text data from academic fields, social media, and Wikipedia articles \cite{mitrofanova2015probabilistic,koltsova2013,May2016AnAO}. Prior to the work on Wikipedia, little attention was given to the role of lemmatization on topic modeling in Russian, and corpora were lemmatized by default. In studying Russian Wikipedia, May et al. (2016) address the impact of lemmatization on topic interpretability via a word intrusion evaluation task, finding that lemmatization may be beneficial. However, they also suggest measuring the effects of lemmatization and do not rule out that lemmatizing in post-processing would also be effective.
+Probabilistic topic modeling has been applied on Russian text data from academic fields, social media, and Wikipedia articles \cite{mitrofanova2015probabilistic,koltsova2013,May2016AnAO}. Prior to the work on Wikipedia, little attention was given to the role of lemmatization on topic modeling in Russian, and corpora were lemmatized by default. In studying Russian Wikipedia, May et al. (2016) address the impact of lemmatization on topic interpretability via a word intrusion evaluation task, finding that lemmatization may be beneficial. However, they also suggest measuring the effects of lemmatization and do not rule out post-processing as an effective solution.
 
 Although we found little prior work on the effects of stemming on topic modeling for German, Rieger et al. present methods for improving the stability of LDA and detail results of experiments on a German newspaper corpus \cite{Rieger2020ImprovingLD}. Their focus is on increasing the reproducibility of LDA topic models by choosing the initial token allocations for Gibbs sampling after comparing multiple LDA models and they limit pre-processing to removal of stopwords and punctuation. Schofield and Mimno also explicitly measured stability of token allocations by using VOI to compare the stemming treatments, finding that certain types of stemming could increase the impact of random initialization, hurting reproducibility.
 
 % TODO Linguistic typology and measuring morphological complexity
+
+
+\begin{table*}[t]
+    \captionof{table}{Examples from of morphological analyses annotated in RNC and TIGER. Morphological features are consistent in the annotation schema allowing slots to be compared across topics and word types.}
+    \label{table:sampleannotations}
+    \centering
+    \begin{tabularx}{6.8in}{|l|l|l|l|X|} \hline
+       \textbf{Token} & \textbf{Lemma} & \textbf{Translation} & \textbf{Annotation} & \textbf{Explanation} \\ \hline
+       \foreignlanguage{russian}{нормально} & \foreignlanguage{russian}{нормальный} & \textit{normal} & A=n,sg,brev & Adjective, neuter, singular, short-form (Russian has long and short form adjectives) \\ \hline
+       \foreignlanguage{russian}{слышала} & \foreignlanguage{russian}{слышать} & \textit{[she]  heard} &
+       V,ipf,tran=f,sg,act,praet,indic & Verb, imperfective aspect, transitive, feminine singular subject, past tense, indicative mood \\ \hline
+       texanishe & texanish & \textit{Texan} & ADJA,Pos,Nom,Sg,Masc & Adjective,positive grade, nominative case, singular, masculine \\ \hline
+       kennt & kennen & \textit{knows} & VVFIN,3,Sg,Pres,Ind & Verb, finite form, 3rd person, singular, present tense, indicative mood \\ \hline
+    \end{tabularx}
+\end{table*}
+
+
+\begin{table*}[t]
+    \captionof{table}{Corpus statistics after removing short documents, stopwords and punctuation.}
+    \label{table:corpusstats}
+    \begin{tabularx}{6.8in}{|l|l|l|X|l|l|} \hline
+        \textbf{Corpus name} & \textbf{\# documents} & \textbf{\# tokens} & \textbf{Average doc length (tokens)} & \textbf{Unique surface forms} & \textbf{Unique lemmas} \\ \hline
+        TIGER & 1260 & 310,925 & 247 & 73,633 & 55,498 \\ \hline
+        RNC & 394 & 319,991 & 812 & 79,413 & 32,487 \\ \hline
+    \end{tabularx}
+\end{table*}
+
+\begin{figure*}[t]
+    \captionof{figure}{Effects of treatment strength on TIGER and RNC, type-to-token ratio (left) and character-to-token ratio. Truncating to 5 characters is the most aggressive treatment. For German (top), Stanza appears to be over-lemmatizing significantly, conflating much more than necessary compared to the oracle from the corpus, while SpaCy is slightly under-lemmatizing. The Russian lemmatizers, Mystem and Stanza, have similar conflation strength to the oracle.}
+    \label{fig:treatment_strength}
+    \begin{tabular}{ll}
+        \includegraphics[width=0.5\textwidth]{tiger_ttr.png} & \includegraphics[width=0.5\textwidth]{tiger_cttr.png} \\
+        \includegraphics[width=0.5\textwidth]{rnc_ttr.png} & \includegraphics[width=0.5\textwidth]{rnc_cttr.png}
+    \end{tabular}
+\end{figure*}
+
+
 
 
 \section{Background}
@@ -93,41 +135,45 @@ LDA uses the observed frequencies of vocabulary terms within documents to infer 
 Following Wallach et. al (2002), we will use a symmetric prior for $\beta$ and an asymmetric prior for $\alpha$ with the MALLET's Gibbs Sampling implementation to train topic models \cite{wallach2009rethinking,McCallumMALLET}. These parameters are optimized every 20 iterations after the first 50, the burn-in period. The Gibbs sampling implementation in MALLET allows us to directly inspect the topic assignments at the level of each token in a document.
 
 \subsection{Framework for Morphological Complexity}
-We will first clarify terms for discussing Russian's morphological paradigms, following frameworks for quantifying morphological complexity used in linguistics and computational linguistics \cite{baerman2015intro,Ackerman2013MorphologicalOT, cotterell-etal-2019-complexity}. We draw a distinction between \textit{derivational} morphology, the process by which new words are formed through changing meaning or part-of-speech, and \textit{inflectional} morphology, which can be simplistically understood as verb paradigms to capture subject-verb agreement or noun declensions for case and grammatical gender. For our purposes here, we are primarily interested in the equivalence classes formed by normalizing inflectional morphology, to use an English example, conflating ``respond" and ``responds", rather than ``respond" and ``responsiveness", although aggressive stemming methods will do both types of conflation.
+We first clarify terms for discussing morphological paradigms, following frameworks for quantifying morphological complexity used in linguistics and computational linguistics \cite{baerman2015intro,Ackerman2013MorphologicalOT, cotterell-etal-2019-complexity}. We draw a distinction between \textit{derivational} morphology, the process by which new words are formed through changing meaning or part-of-speech, and \textit{inflectional} morphology, which can be simplistically understood as verb paradigms to capture subject-verb agreement or noun declensions for case and grammatical gender. For our purposes here, we are primarily interested in the equivalence classes formed by normalizing inflectional morphology, to use an English example, conflating ``respond" and ``responds", rather than ``respond" and ``responsiveness", although aggressive stemming methods will do both types of conflation.
 
 In the word-based morphology framework, inflection is captured by triples consisting of the surface form (also called wordform) $w$, a lexeme  signifying the meaning and a slot $\sigma$, which can be understood as a set of ``atomic" units of morphological meaning, also called inflectional features \cite{aronoff1976word,sylak-glassman-etal-2015-language,cotterell-etal-2019-complexity}.
-A lemma is the surface form used to look up the lexeme in a dictionary, such as the infinitive verb form. Measurements of the size of a lexeme's morphological paradigm capture \textit{enumerative complexity}, the number of distinct surface forms for a particular part-of-speech \cite{Ackerman2013MorphologicalOT}. A lexeme's mapping between slots and the surface forms is not always straightforward outside the context of a sentence, as multiple slots may be realized with a single surface form. This type of morphological complexity is called \textit{syncretism} and is common in Russian noun and adjective declensions \cite{baerman2015understanding,Milizia2015PatternsOS}. German also demonstrates syncretism in adjective agreement for noun case and gender \cite{Crysmann2005SyncretismIG}.
+A lemma is the surface form used to look up the lexeme in a dictionary, such as the infinitive verb form. Measurements of the size of a lexeme's morphological paradigm capture \textit{enumerative complexity}, the number of distinct surface forms for a particular part-of-speech \cite{Ackerman2013MorphologicalOT}. A lexeme's mapping between slots and the surface forms is not always straightforward outside the context of a sentence, as multiple slots may be realized with a single surface form. This type of morphological complexity is called \textit{syncretism} and is common in Russian noun and adjective declensions \cite{baerman2015understanding,Milizia2015PatternsOS}. German also demonstrates syncretism in verbs between infinitive and present tense plural indicative forms and in adjective agreement for noun case and gender \cite{Crysmann2005SyncretismIG}.
 
 \section{Corpora}
+In order to perform the desired analysis of the topic models, we needed corpora with high quality annotations of lemmas and morphological features and documents long enough for training topic models. For German, we selected the TIGER corpus version 2.2 \cite{Brants2004TIGERLI}, a set of newspaper articles from the Frankfuter Rundshau. The \textit{public}, texts from newspapers and magazines, and \textit{speech}, transcripts of radio and television interviews, portions of the Russian National corpus (RNC) were chosen for Russian. In both these corpora, morphological slots are annotated as consistently ordered lists of the features, as shown in table \ref{table:sampleannotations}. We also considered using OpenCorpora\footnote{\url{opencorpora.org}}, a crowd annotated Russian corpus, but this proved difficult to use for our purposes as syncretic word forms are not fully disambiguated in the annotations.
+
+Particular care was taken in pre-processing, as evaluation metrics are sensitive to token counts and vocabulary sizes. Due to the nature of the annotations, both corpora are pre-tokenized. Documents with less than 100 tokens were excluded, then punctuation and stopwords from a fixed list were removed. Corpora statistics after these pre-processing steps are given in \ref{table:corpusstats}. Finally, each token was stemmed or lemmatized according to a selected method described in section \ref{sec:stemmers}. We also trained experiments with the original surface forms, later referred to as 'raw' or 'untreated'. This results in seven versions of each corpus, one for each stemming or lemmatization treatment.
+
 
 \section{Methods}
-% TODO: detail corpus preprocessing
+For each pre-processing treatment described below, ten LDA topic models are trained for both 50 and 100 topic models in MALLET. This allows us to compare evaluation metrics across multiple experimental runs, reducing the chance that any observed effects result fron randomness in training.
 
 
 \subsection{Stemmers and Lemmatization Treatments}
 % TODO detail German stemmers (spacy and snowball)
 \label{sec:stemmers}
-Following Schofield and Mimno (2016), we distinguish between rule-based stemmers, which are deterministic, but only remove endings and do not map to lemmas, and context-based lemmatizers, which rely on a dictionary of word forms paired with outputs from a part-of-speech tagger to produce lemmas \cite{schofield-mimno-2016-comparing,Sharoff2011ThePP}. Rule-based methods make no distinction between inflectional and derivational morphological processes, leading to word types, conflation classes of terms, whose original surface forms may cover several lemmas.
+Following Schofield and Mimno (2016), we distinguish between rule-based stemmers, which are deterministic, but only remove endings and do not map to lemmas, and context-based lemmatizers, which can rely on a dictionary of word forms paired with outputs from a part-of-speech tagger to produce lemmas \cite{schofield-mimno-2016-comparing,Sharoff2011ThePP} or may be pre-trained machine learning models for part-of-speech and morphological feature tagging \cite{qi2020stanza}. Rule-based methods make no distinction between inflectional and derivational morphological processes, leading to word types, conflation classes of terms, whose original surface forms may cover several lemmas.
 
-\textbf{Oracle:}
+\textbf{Oracle:} This treatment consists of taking the lemma as annotated from the corpus, standing in as a highly accurate lemmatizer.
 
-\textbf{Truncation:} This simple baseline method trims surface forms to the first $n$ characters \cite{schofield-mimno-2016-comparing}. We truncate with $n=5$.
+\textbf{Truncation:} This simple baseline method trims surface forms to the first $n$ characters \cite{schofield-mimno-2016-comparing}. We truncate with $n=5$ and $n=6$.
 
 \textbf{Snowball Stemmer:} This stemmer was introduced as a rigorous framework for implementing stemming algorithms for a variety of languages. We utilize the NLTK implementation\footnote{\url{https://www.nltk.org/api/nltk.stem.html}} with the original rules for Russian\footnote{\url{http://snowball.tartarus.org/algorithms/russian/stemmer.html}} and German\footnote{\url{http://snowball.tartarus.org/algorithms/german/stemmer.html}} \cite{snowball}.
 
 
 \textbf{Mystem:} This Yandex-owned tool is the most popular Russian lemmatizer and can be used without part-of-speech tags. Pairing a finite state machine algorithm for stemming with the Zalizniak grammatical dictionary for morphological tags, this system outputs a list of possible lemmas and slots for a given token input. The system also produces probabilities for each lemma and slot based on word frequency statistics, although the source corpus for these probabilities is not clear \cite{Segalovich2003AFM}. This is not truly a context-based lemmatizer, as it does not use part-of-speech tags to disambiguate between lemmas or to assign a single slot to a syncretic surface form, but the word frequencies do represent some kind of contextual prior. We use the python wrapper for Mystem, pymystem3\footnote{\url{pythonhosted.org/pymystem3/pymystem3.html}}. Notably, Mystem is as fast as the Snowball stemmer, while producing a normalized lemma form that is more interpretable for users.
 
-\textbf{SpaCy:} TODO
+\textbf{spaCy:} SpaCy v.3\footnote{\url{spacy.io}} supports different kinds of rule-based or dictionary lookup lemmatizers, depending the language\footnote{\url{https://spacy.io/api/lemmatizer}}. Their German pipeline\footnote{\url{https://spacy.io/models/de\#de\_core\_news\_lg}} uses a dictionary lookup, reporting lemmatization accuracy of 73\% on data which include TIGER. We do not use spaCy for Russian.
 
 
-\textbf{Stanza:} This toolkit implements full neural pipelines for processing raw text, including tagging morphological features using bidirectional long short-term memory networks and lemmatizing an ensemble of dictionary based and seq2seq methods \cite{qi2020stanza}. Because each step of the pipeline depends on the output of the previous step, in order to use Stanza for morphological tagging and lemmatization, we also use its tokenization and sentence-splitting. We use the Stanza model trained on the SynTagRus treebank\footnote{\url{https://universaldependencies.org/treebanks/ru_syntagrus/index.html}}. Unlike Mystem, Stanza always produces a single lemma and morphological slot, the disambiguation step is included within the model.
+\textbf{Stanza:} This toolkit implements full neural pipelines for processing raw text, including tagging morphological features using bidirectional long short-term memory networks and lemmatizing an ensemble of dictionary based and seq2seq methods \cite{qi2020stanza}. Typically, Stanza models operate as a full NLP pipeline from tokenization to tagging output, however because we need to compare the output of each treatment, we used Stanza to lemmatize a single token at a time, which may hurt the accuracy of lemmatization and morphological tagging (see \ref{fig:treatment_strength}). For Russian, we use the Stanza model trained on the SynTagRus treebank\footnote{\url{https://universaldependencies.org/treebanks/ru_syntagrus/index.html}}, which has the RNC as a subset, and for German, we use Hamburg Dependency treebank model\footnote{\url{https://universaldependencies.org/treebanks/de_hdt/index.html}}.
 
 \subsection{Evaluation metrics}
 %TODO: rewrite this section
-When it comes to topic modeling on Russian, we would like to quantify the trade-offs between topic interpretability and loss of information that is linked to a surface form's morphology. We can apply Mystem or Stanza to retrieve the most likely morphological analysis for a surface form $w$ in the vocabulary $V$ to find a lemma $\ell_w$ and slot $\sigma_w$. Using the token-level topic assignments from Gibbs Sampling as our surface form $w$, we follow Thompson and Mimno (2018) in viewing single topic assignments for each surface form as a data table with columns: surface form $w$, topic assignment $k$, slot $\sigma$, lemma $\ell$. For a given topic $k$, we obtain the joint count of the slots for the topic $N(\sigma, k)$, the counts of the lemmas for a topic $N(\ell, k)$ and the marginal count variable for a topic $N(k)$. Also note that $\argmax_{w \in V} N(w, k)$ denotes the top key words or surface forms for the topic.
+We would like to quantify the trade-offs between topic interpretability and loss of information that is linked to a surface form's morphology. The annotated corpora give the morphological analysis for a surface form $w$ as a lemma $\ell_w$ and slot $\sigma_w$. Using the token-level topic assignments from Gibbs Sampling as our surface form $w$, we follow Thompson and Mimno (2018) in viewing single topic assignments for each surface form as a data table with columns: surface form $w$, topic assignment $k$, slot $\sigma$, lemma $\ell$. For a given topic $k$, we obtain the joint count of the slots for the topic $N(\sigma, k)$, the counts of the lemmas for a topic $N(\ell, k)$ and the marginal count variable for a topic $N(k)$. Also note that $\argmax_{w \in V} N(w, k)$ denotes the top key words or surface forms for the topic.
 
-\subsubsection{Entropy-based morphology measurements}
+\subsubsection{Entropy-based measurements}
 % Ranges for these values will differ depending on the size of a language's morphological paradigms
 
 \textbf{Morphological slot entropy:} The goal of this metric is to measure the concentration of slots within a given topic, a proxy for the enumerative complexity of the topic. Does a topic have a concentration of only a few morphological features or does it have a wide spread of the language's inventory of features? This metric is similar to Author Entropy discussed in Thompson and Mimno (2018), where the morphology of the language is the metadata we are attempting to capture, rather than the author of a document \cite{Thompson2018AuthorlessTM}. Topics that have low slot entropy would contain wordforms with the same grammatical features, for example different verbs conjugated in the first-person singular form or nominative case masculine nouns.
@@ -140,7 +186,7 @@ When it comes to topic modeling on Russian, we would like to quantify the trade-
     H(\ell|k) &= \sum_\ell P(\ell|k) \log_2 P(\ell|k) \\ \nonumber&= \sum_\ell \frac{N(\ell, k)}{N(k)} \log_2 \frac{N(\ell, k)}{N(k)}
 \end{flalign}
 
-\subsubsection{Counting-based morphology measurements}
+\subsubsection{Counting-based measurements}
 In practice, topics are often identified by keywords, the most frequently allocated terms to a topic. However, without pre-processing it's possible that the set of top $n$ keywords consists of many surface forms of the same lexeme, obscuring forms of other lexemes that could be useful to identifying the topic. Similarly, it's possible that a lexeme's allocations to a topic are spread across many word forms, such that no forms of the lexeme appear in the keywords for the topic, even though this may be the most frequent lemma allocated for the topic. Both of these problems occurring simultaneously for many topics would suggest a need for post-processing treatment.
 
 \textbf{Lemmas expressed by top $n$ key terms:} This set is targeted at understanding how concise the presentation of a topic's key terms is to a user. When its size is close to $n$, each key term presented to the user represents a unique lexeme or multiple lexemes in cases of lexical ambiguity. If the set's size is closer to 1, different forms of the same lexeme are repeated in the keywords.
@@ -153,25 +199,65 @@ In practice, topics are often identified by keywords, the most frequently alloca
     L(k) &= \{\ell | \ell \in \{n \, \mathrm{largest} N(\ell, k)\}\}
 \end{flalign}
 
-\textbf{Exclusivity:} Exclusivity quantifies the relative uniqueness of the top keywords in a topic. It is high when the terms most frequently generated by a topic are rarely generated by other topics in the model \cite{bischof2012exclusivity}. This metric can also be modified to quantify the relative uniqueness of lemmas to a topic, which we call \textit{lemma exclusivity}.
-
 \subsubsection{Strength of treatment measurements}
 These measurements quantify the aggressiveness of stemming or lemmatization.
 
-\textbf{Type-token ratio:} Following Schofield and Mimno (2016), this corpus-level metric measures a stemmer or lemmatizer's conflation strength. It is found by taking the ratio of the number of word-type equivalence classes produced by the treatment (the post-treatment vocabulary size $|V|$) to the token counts for the corpus \cite{schofield-mimno-2016-comparing}.
+\textbf{Type-token ratio:} Following Schofield and Mimno (2016), this corpus-level metric measures a stemmer or lemmatizer's conflation strength. It is found by taking the ratio of the number of word-type equivalence classes produced by the treatment (the post-treatment vocabulary size $|V|$) to the token counts for the corpus \cite{schofield-mimno-2016-comparing}. Smaller values indicate more tokens are conflated to the same word type by the treatment.
 
-\textbf{Character-token ratio:} This metric, also from Schofield and Mimno (2016), measures the aggressiveness of stemmers in trimming surface forms to a root form. It measures the average length of the tokens in the corpus after the stemming treatment. Because lemmatizers map surface forms to a normalized lemma instead, this metric isn't as meaningful for lemmatization.
+\textbf{Character-token ratio:} This corpus-level metric, also from Schofield and Mimno (2016), measures the aggressiveness of stemmers in trimming surface forms to a root form. It measures the average length of the tokens in the corpus after the stemming treatment. Because lemmatizers map surface forms to a normalized lemma instead, this metric isn't as meaningful for lemmatization.
 
 \subsubsection{Topic Quality}
-% TODO
+
+\textbf{Variation of information:} This symmetric metric allows for comparing different clusterings of the same dataset \cite{Meila2003ComparingCB}. Inherent randomness in the LDA algorithm will cause some variation across experiments, but VOI will be lower when clusterings are consistently similar over multiple runs. Viewing topics as clusterings of tokens, we follow Schofield and Mimno (2016) in distinguishing \textit{intra-treatment} VOI to quantify topic stability over experiments using the same pre-processing treatment,  from \textit{inter-treatment VOI}, used to compare the effects of one treatment on clustering to another treatment.
+
+\textbf{Coherence:} An automatic metric computed from document co-occurence of a topic's top terms, coherence that has been show to correspond with human judgements on topic quality \cite{mimno2011optimizing}. Because coherence is sensitive to vocabulary size, we calculate coherence based on the surface forms of the untreated tokens \cite{schofield-mimno-2016-comparing} and based on the lemmas of tokens, \textit{lemma coherence}, in order to have a fair comparison between treatments.
+
+\textbf{Exclusivity:} Exclusivity quantifies the relative uniqueness of the top keywords in a topic. It is high when the terms most frequently generated by a topic are rarely generated by other topics in the model \cite{bischof2012exclusivity}. This metric can also be modified to quantify the relative uniqueness of lemmas to a topic. We rely on topic exclusivity computed by MALLET \footnote{\url{https://mallet.cs.umass.edu/diagnostics.php}} using either the original tokens or lemmas as the vocabulary.
+
+\begin{figure*}[t]
+    \captionof{figure}{Exclusivity computed with word types from the untreated vocabulary and lemma exclusivity over 10 experiments for each treatment. Higher values mean that topics' top terms do not overlap with other topics' top terms. Plots show median and interquartial range. Lemmatization and stemming increase exclusivity for the German TIGER corpus, but do not have a consistent effect on the Russian National Corpus.}
+    \label{fig:exclusivity}
+    \begin{tabular}{ll}
+        \includegraphics[height=0.45\textwidth]{tiger_exclusivity_fall21.png} & \includegraphics[height=0.45\textwidth]{tiger_lemma_exclusivity.png} \\
+        \includegraphics[height=0.45\textwidth]{rnc_exclusivity_fall21.png} &
+        \includegraphics[height=0.45\textwidth]{rnc_lemma_exclusivity.png}
+    \end{tabular}
+\end{figure*}
+
+\begin{figure*}[t]
+    \captionof{figure}{Negative coherence computed using topic assignments for tokens using the word types in the original vocabulary (left) and lemmas over 10 experiments for each treatment. Plots show median and interquartile range. Lower values may correspond to more coherent topics according to human judgements. Lemmatization seems to increase slightly coherence for the German TIGER corpus (top), but results for the Russian National Corpus are inconclusive.}
+    \label{fig:negative_coherence}
+    \begin{tabular}{ll}
+        \includegraphics[height=0.45\textwidth]{tiger_coherence_original_vocab.png} &
+        \includegraphics[height=0.45\textwidth]{tiger_lemma_coherence.png} \\
+        \includegraphics[height=0.45\textwidth]{rnc_coherence_original_vocab.png} &
+        \includegraphics[height=0.45\textwidth]{rnc_lemma_coherence.png}
+    \end{tabular}
+\end{figure*}
+
 
 
 \section{Results}
+\subsection{Conflation strength of treatments}
+
+\subsection{Utility of entropy metrics}
+\begin{figure*}[t]
+    \captionof{figure}{Using the measurements from 10 50-topic models (left) and 10 100-topic models trained on the untreated word types, we plot a topic's lemma entropy (x-axis) vs its slot entropy. Solid lines show the mean and dotted lines indicate two standard deviations of the mean.}
+    \label{fig:entropymetrics}
+    \begin{tabular}{ll}
+        \includegraphics[height=0.30\textwidth]{tiger_lemma_vs_slot_50.png} & \includegraphics[height=0.30\textwidth]{tiger_lemma_vs_slot_100.png} \\
+        \includegraphics[height=0.30\textwidth]{rnc_lemma_vs_slot_50.png} &
+        \includegraphics[height=0.30\textwidth]{rnc_lemma_vs_slot_100.png}
+    \end{tabular}
+
+\end{figure*}
+
+
 \subsection{Counting top lexemes}
 
 \begin{figure*}[t]
+    \captionof{figure}{Comparison of the top 20 lemmas for each topic and the lemmas covered by the topic's top 20 key terms, over 10 experiments on the untreated corpus. The cells show the number of topics with the corresponding set differences between $L(k)$ and $K_\ell(k)$. Values in the upper left indicate topics with high overlap in lemmas of the top terms and the topic's most frequent lemmas. Values in the lower left are topics where the top terms are obscured by the top terms, good candidates for post-stemming. Values in the lower right indicate large mismatches between those sets, a challenge for topic interpretability.}
     \label{fig:intersection}
-    \captionof{figure}{Comparison of the top 20 lemmas for each topic and the lemmas covered by the topic's top 20 key terms, over 10 experiments on the untreated corpus. The cells show the number of topics with the corresponding set differences between $L(k)$ and $K_\ell(k)$. Values in the upper left indicate topics with high overlap in lemmas of the top terms and the topic's most frequent lemmas. Values in the lower left are topics where the top terms are obscured by the top terms, good candidates for post-stemming. Values in the lower right indicate large mismatches between those sets, a challenge for topic interpretability. }
     \begin{tabular}{ll}
         \includegraphics[width=0.5\textwidth]{tiger_intersections_50_topics.png} & \includegraphics[width=0.5\textwidth]{tiger_intersections_100_topics.png} \\
         \includegraphics[width=0.5\textwidth]{rnc_intersections_50_topics.png} & \includegraphics[width=0.5\textwidth]{rnc_intersections_100_topics.png}
@@ -180,10 +266,11 @@ These measurements quantify the aggressiveness of stemming or lemmatization.
 
 
 \subsection{VOI and topic stability}
+% Highly accurate lemmatizers help stability, but stanza's performance on German suggests proceeding with caution
 
 \begin{figure*}[t]
-    \label{fig:voi}
     \captionof{figure}{Variation of information between pre-processing treatments averaged over pairwise comparison of 10 experiments for each treatment. `Raw' indicates that no stemming or lemmatization pre-processing was performed.}
+    \label{fig:voi}
     \begin{tabular}{ll}
         \includegraphics[width=0.5\textwidth]{tiger_voi_50_topics.png} & \includegraphics[width=0.5\textwidth]{tiger_voi_100_topics.png} \\
         \includegraphics[width=0.5\textwidth]{rnc_voi_50_topics.png} & \includegraphics[width=0.5\textwidth]{rnc_voi_100_topics.png}
@@ -200,8 +287,8 @@ These measurements quantify the aggressiveness of stemming or lemmatization.
 
 
 \begin{table*}
-    \label{sec:poststem_topics}
     \captionof{table}{These are sample topics from 50 topic models trained on the untreated corpora demonstrating how the difference between $K_\ell(k)$ and $L(k)$ can be used to identify topics as candidates for post-stemming.}
+    \label{sec:poststem_topics}
     \begin{tabularx}{\textwidth}{|X|X|l|l|X|} \hline
     $K_\ell(k)$ & $L(k)$ & $|L(k) - K_\ell(k)|$ & $|K_\ell(k) - L(k)|$ &  \textbf{Comment} \\ \hline
     \end{tabularx}
