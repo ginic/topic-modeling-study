@@ -162,7 +162,7 @@ Following Schofield and Mimno (2016), we distinguish between rule-based stemmers
 \textbf{Snowball Stemmer:} This stemmer was introduced as a rigorous framework for implementing stemming algorithms for a variety of languages. We utilize the NLTK implementation\footnote{\url{https://www.nltk.org/api/nltk.stem.html}} with the original rules for Russian\footnote{\url{http://snowball.tartarus.org/algorithms/russian/stemmer.html}} and German\footnote{\url{http://snowball.tartarus.org/algorithms/german/stemmer.html}} \cite{snowball}.
 
 
-\textbf{Mystem:} This Yandex-owned tool is the most popular Russian lemmatizer and can be used without part-of-speech tags. Pairing a finite state machine algorithm for stemming with the Zalizniak grammatical dictionary for morphological tags, this system outputs a list of possible lemmas and slots for a given token input. The system also produces probabilities for each lemma and slot based on word frequency statistics, although the source corpus for these probabilities is not clear \cite{Segalovich2003AFM}. This is not truly a context-based lemmatizer, as it does not use part-of-speech tags to disambiguate between lemmas or to assign a single slot to a syncretic surface form, but the word frequencies do represent some kind of contextual prior. We use the python wrapper for Mystem, pymystem3\footnote{\url{pythonhosted.org/pymystem3/pymystem3.html}}. Notably, Mystem is as fast as the Snowball stemmer, while producing a normalized lemma form that is more interpretable for users.
+\textbf{Mystem:} This Yandex-owned tool is the most popular Russian lemmatizer and can be used without part-of-speech tags. Pairing a finite state machine algorithm for stemming with the influential Zalizniak grammatical dictionary for morphological tags \cite{zaliznyak1977}, this system outputs a list of possible lemmas and slots for a given token input. The system also produces probabilities for each lemma and slot based on word frequency statistics, although the source corpus for these probabilities is not clear \cite{Segalovich2003AFM}. This is not truly a context-based lemmatizer, as it does not use part-of-speech tags to disambiguate between lemmas or to assign a single slot to a syncretic surface form, but the word frequencies do represent some kind of contextual prior. We use the python wrapper for Mystem, pymystem3\footnote{\url{pythonhosted.org/pymystem3/pymystem3.html}}. Notably, Mystem is as fast as the Snowball stemmer, while producing a normalized lemma form that is more interpretable for users.
 
 \textbf{spaCy:} SpaCy v.3\footnote{\url{spacy.io}} supports different kinds of rule-based or dictionary lookup lemmatizers, depending the language\footnote{\url{https://spacy.io/api/lemmatizer}}. Their German pipeline\footnote{\url{https://spacy.io/models/de\#de\_core\_news\_lg}} uses a dictionary lookup, reporting lemmatization accuracy of 73\% on data which include TIGER. We do not use spaCy for Russian.
 
@@ -171,12 +171,36 @@ Following Schofield and Mimno (2016), we distinguish between rule-based stemmers
 
 \subsection{Evaluation metrics}
 %TODO: rewrite this section
-We would like to quantify the trade-offs between topic interpretability and loss of information that is linked to a surface form's morphology. The annotated corpora give the morphological analysis for a surface form $w$ as a lemma $\ell_w$ and slot $\sigma_w$. Using the token-level topic assignments from Gibbs Sampling as our surface form $w$, we follow Thompson and Mimno (2018) in viewing single topic assignments for each surface form as a data table with columns: surface form $w$, topic assignment $k$, slot $\sigma$, lemma $\ell$. For a given topic $k$, we obtain the joint count of the slots for the topic $N(\sigma, k)$, the counts of the lemmas for a topic $N(\ell, k)$ and the marginal count variable for a topic $N(k)$. Also note that $\argmax_{w \in V} N(w, k)$ denotes the top key words or surface forms for the topic.
 
 \subsubsection{Entropy-based measurements}
-% Ranges for these values will differ depending on the size of a language's morphological paradigms
+We would like to quantify the trade-offs between topic interpretability and loss of information that is linked to a surface form's morphology. The annotated corpora give the morphological analysis for a surface form $w$ as a lemma $\ell_w$ and slot $\sigma_w$. Using the token-level topic assignments from Gibbs Sampling as our surface form $w$, we follow Thompson and Mimno (2018) in viewing single topic assignments for each surface form as a data table with columns: surface form $w$, topic assignment $k$, slot $\sigma$, lemma $\ell$. For a given topic $k$, we obtain the joint count of the slots for the topic $N(\sigma, k)$, the counts of the lemmas for a topic $N(\ell, k)$ and the marginal count variable for a topic $N(k)$. Also note that $\argmax_{w \in V} N(w, k)$ denotes the top keywords or surface forms for the topic.
 
-\textbf{Morphological slot entropy:} The goal of this metric is to measure the concentration of slots within a given topic, a proxy for the enumerative complexity of the topic. Does a topic have a concentration of only a few morphological features or does it have a wide spread of the language's inventory of features? This metric is similar to Author Entropy discussed in Thompson and Mimno (2018), where the morphology of the language is the metadata we are attempting to capture, rather than the author of a document \cite{Thompson2018AuthorlessTM}. Topics that have low slot entropy would contain wordforms with the same grammatical features, for example different verbs conjugated in the first-person singular form or nominative case masculine nouns.
+\begin{figure*}[t]
+    \captionof{figure}{The distribution of lemma entropies for topics computed using the allocations of tokens over experiments different numbers of topics and pre-processing treatments, with median and interquartile range marked. The treatments that conflate more terms together result in topics with lower lemma entropy. The large ranges of lemma entropy values for truncation stemmers are a likely a reflection of how much these treatments overstem and understem by their nature, since they are not tied to the language's lexicon or morphological paradigms.}
+    \label{fig:lemmaentropy}
+    \begin{tabular}{ll}
+        \includegraphics[width=0.5\textwidth]{tiger_lemma_entropy_50.png} &
+        \includegraphics[width=0.5\textwidth]{tiger_lemma_entropy_100.png} \\
+        \includegraphics[width=0.5\textwidth]{rnc_lemma_entropy_50.png} &
+        \includegraphics[width=0.5\textwidth]{rnc_lemma_entropy_100.png}
+    \end{tabular}
+\end{figure*}
+
+
+\begin{figure*}[t]
+    \captionof{figure}{The distribution of slot entropies for topics computed using the allocations of tokens over experiments with the various pre-processing treatments, with median and interquartile range marked.}
+    \label{fig:slotentropy}
+    \begin{tabular}{ll}
+        \includegraphics[width=0.5\textwidth]{tiger_slot_entropy_50.png} &
+        \includegraphics[width=0.5\textwidth]{tiger_slot_entropy_100.png} \\
+        \includegraphics[width=0.5\textwidth]{rnc_slot_entropy_50.png} &
+        \includegraphics[width=0.5\textwidth]{rnc_slot_entropy_100.png}
+    \end{tabular}
+\end{figure*}
+
+
+
+\textbf{Morphological slot entropy:} The goal of this metric is to measure the concentration of slots within a given topic, a proxy for the enumerative complexity of the topic. Does a topic have a concentration of only a few morphological features or does it have a wide spread of the language's inventory of features? This metric is similar to Author Entropy discussed in Thompson and Mimno (2018), where the morphology of the language is the metadata we are attempting to capture, rather than the author of a document \cite{Thompson2018AuthorlessTM}. Topics that have low slot entropy would contain wordforms with the same grammatical features, for example different verbs conjugated in the first-person singular form or nominative case masculine nouns. The range for this metric is affected by the size of morphological paradigms for various parts-of-speech in a language.
 \begin{flalign}
     H(\sigma|k) &= \sum_\sigma P(\sigma|k) \log_2 P(\sigma|k) \\ \nonumber&= \sum_\sigma \frac{N(\sigma, k)}{N(k)} \log_2 \frac{N(\sigma, k)}{N(k)}
 \end{flalign}
@@ -215,7 +239,7 @@ These measurements quantify the aggressiveness of stemming or lemmatization.
 \textbf{Exclusivity:} Exclusivity quantifies the relative uniqueness of the top keywords in a topic. It is high when the terms most frequently generated by a topic are rarely generated by other topics in the model \cite{bischof2012exclusivity}. This metric can also be modified to quantify the relative uniqueness of lemmas to a topic. We rely on topic exclusivity computed by MALLET \footnote{\url{https://mallet.cs.umass.edu/diagnostics.php}} using either the original tokens or lemmas as the vocabulary.
 
 \begin{figure*}[t]
-    \captionof{figure}{Exclusivity computed with word types from the untreated vocabulary and lemma exclusivity over 10 experiments for each treatment. Higher values mean that topics' top terms do not overlap with other topics' top terms. Plots show median and interquartial range. Lemmatization and stemming increase exclusivity for the German TIGER corpus, but do not have a consistent effect on the Russian National Corpus.}
+    \captionof{figure}{Exclusivity computed with word types from the untreated vocabulary and lemma exclusivity over 10 experiments for each treatment. Higher values mean that topics' top terms do not overlap with other topics' top terms. Plots show median and interquartial range. Lemmatization and stemming increase exclusivity of word types for the German TIGER corpus, but do not have a consistent effect on the Russian National Corpus. Word types are more exclusive than lemmas in the untreated corpus, a difference which is more pronounced in the Russian corpus.}
     \label{fig:exclusivity}
     \begin{tabular}{ll}
         \includegraphics[height=0.45\textwidth]{tiger_exclusivity_fall21.png} & \includegraphics[height=0.45\textwidth]{tiger_lemma_exclusivity.png} \\
@@ -266,10 +290,16 @@ These measurements quantify the aggressiveness of stemming or lemmatization.
 
 
 \subsection{VOI and topic stability}
+%"...light stemming may improve the comparative similarity of topic models, heavier stemmers produce less stabel topic assignments"
+% More true for German than Russian, although that could be a difference in corpus domain
+
+
 % Highly accurate lemmatizers help stability, but stanza's performance on German suggests proceeding with caution
+% Truncation is very different from lemmatization, snowball and the raw corpus. It also has very high intra-treatment VOI (same as Schofield and Mimno for English)
+% Low intra-treatment VOI and VOI for few topics lower than for higher (like Schofield and Mimno observed)
 
 \begin{figure*}[t]
-    \captionof{figure}{Variation of information between pre-processing treatments averaged over pairwise comparison of 10 experiments for each treatment. `Raw' indicates that no stemming or lemmatization pre-processing was performed.}
+    \captionof{figure}{Variation of information between pre-processing treatments averaged over pairwise comparison of 10 experiments for each treatment. Lemmatization methods have the lowest intra-treatment VOI, except for 100 topics in the RNC, where the no treatment gives the lowest value. Inter-treatment VOIs between truncation and lemmatization treatments are the high. Snowball has more overlap with lemmatization methods than simple truncation or no treatment.}
     \label{fig:voi}
     \begin{tabular}{ll}
         \includegraphics[width=0.5\textwidth]{tiger_voi_50_topics.png} & \includegraphics[width=0.5\textwidth]{tiger_voi_100_topics.png} \\
