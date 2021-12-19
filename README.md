@@ -17,7 +17,6 @@ Independent study on topic modeling with a focus on investigating non-English li
 Corpus pre-processing and topic modeling experiments are done using shell scripts in `scripts`.
 
 ## Building the corpus
-The `topic_modeling/corpus_preprocessing.py` will create Mallet formate `.tsv` files the raw tokens, oracle lemmas and each appropriate stemmer given the language of the corpus. The `scripts/preprocess_corpus.sh` is a convenience wrapper around the python script.
 
 ## Corpus statistics
 To generate counts of tokens, word types, type to token ratio and character to token ratio for each stemming treatment, use `scripts/corpus_stats.sh`. It takes the `.tsv` files output from `topic_modeling/corpus_preprocessing.py` and produces a `.tsv`.
@@ -38,4 +37,5 @@ Required options:
 Two scripts, `scripts/recompute_entropy_metrics.sh` and `scripts/compute_original_vocab_coherence.sh`, can be used to generate all metrics used in the final report. Both scripts rely on Mallet diagnostics and `topic_modeling/mallet_parser.py`, producing produce Mallet state and `.tsv` files.
 
 Use `scripts/recompute_entropy_metrics.sh` instead of `scripts/build_model_metris.sh` just to re-compute entropy metrics and Mallet diagnostics for completed experiments without re-training models.
-For calculating coherence and exclusivity according to the original untreated vocabulary, use `scripts/compute_original_vocab_coherence.sh`.
+
+For calculating coherence and exclusivity according to the original untreated vocabulary, use `scripts/compute_original_vocab_coherence.sh`. You will need to fill in paths to the relevant Mallet files for an untreated experiment. 
