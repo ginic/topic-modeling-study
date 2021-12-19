@@ -4,9 +4,10 @@ The main/script will lemmatize or stem a given input TSV in Mallet format
 and produced another TSV in Mallet format with appropriately normalized text
 and a TSV with counts of each (token,lemma) pair by author.
 """
-import abc
+# TODO language options added beyond russian for script behaviour
+# TODO Add morphological analyzer class as mixin for stanza, spacy and pymystem
+from abc import ABC, abstractmethod
 import argparse
-import csv
 import collections
 import time
 import traceback
@@ -15,6 +16,7 @@ import nltk.stem.snowball as nltkstem
 import pandas as pd
 import pymorphy2
 import pymystem3
+import spacy
 import stanza
 
 import topic_modeling.tokenization as tokenization
@@ -25,11 +27,14 @@ PYMYSTEM = 'pymystem3'
 SNOWBALL = 'snowball'
 STANZA = 'stanza'
 TRUNCATE = 'truncate'
-STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE]
+SPACY = "spacy"
+STEMMER_CHOICES = [PYMORPHY, PYMYSTEM, SNOWBALL, STANZA, TRUNCATE, SPACY]
 
-# Desired stanza Russian modeling settings
+# Desired stanza modeling settings
 STANZA_SETTINGS = 'tokenize,pos,lemma'
-STANZA_PACKAGE = 'syntagrus'
+# Note regarding German stanza models: The 'gsd' model is the default model, but it expands contractions to multiword tokens
+# (e.g. 'zum' to 'zu dem' rather than 'zu'), which could cause headaches.
+STANZA_PACKAGE = {'ru':'syntagrus', 'de':'hdt'}
 
 # Pymystem keys
 PYMYSTEM_ANALYSIS = 'analysis'
@@ -75,24 +80,45 @@ class StemmingError(Exception):
     """Raised when underlying stemmers do not behave as expected"""
     pass
 
-class StanzaLemmatizer:
-    """Wrapper around the Stanza/Stanford CoreNLP lemmatizer for Russian
+
+class AbstractLemmatizer(ABC):
+    """Abstract class for defining behaviour of Stemmers and Lemmatizers
     """
-    def __init__(self, keep_punct=False):
+    @abstractmethod
+    def lemmatize(self, text):
+        """Tokenizes text, then returns a list of (token, lemma) pairs for tokens in text.
+
+        :param text: str, text to process
+        """
+
+    @abstractmethod
+    def single_term_lemma(self, word):
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        """
+
+
+class StanzaLemmatizer(AbstractLemmatizer):
+    """Wrapper around the Stanza/Stanford CoreNLP lemmatizer.
+    """
+    def __init__(self, keep_punct=False, language='ru'):
         """Instantiates Stanza lemmatizer and ensures 'ru' models are downloaded
 
         :param keep_punct: True to keep tokens/lemmas that are just punctuation
+        :param language: str, two letter language code
         """
-        stanza.download('ru', processors=STANZA_SETTINGS, package=STANZA_PACKAGE)
-        self.pipeline = stanza.Pipeline('ru',processors=STANZA_SETTINGS,
-                                        package=STANZA_PACKAGE)
+        stanza_package = STANZA_PACKAGE[language]
+        stanza.download(language, processors=STANZA_SETTINGS, package=stanza_package)
+        self.pipeline = stanza.Pipeline(language,processors=STANZA_SETTINGS,
+                                        package=stanza_package)
         self.keep_punct = keep_punct
 
-    def lemmatize(self, text, keep_punct=False):
+    def lemmatize(self, text):
         """Returns list of (word, lemma) pairs for each word in the given text.
         Stanza's sentence breaking and tokenization is used.
 
-        :param text: str, Russian text to process
+        :param text: str, text to process
         """
         result = list()
         doc = self.pipeline(text)
@@ -116,12 +142,12 @@ class StanzaLemmatizer:
 
 
 
-class SnowballStemmer:
+class SnowballStemmer(AbstractLemmatizer):
     """Wrapper around NLTK's implementation of the Snowball Stemmer,
     which uses an improved Porter stemming algorithm.
     http://snowball.tartarus.org/algorithms/russian/stemmer.html
     """
-    def __init__(self, tokenizer=None):
+    def __init__(self, tokenizer=None, language='russian'):
         """Instantiate NLTK Snowball stemmer. Default tokenizer
         is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
@@ -131,12 +157,11 @@ class SnowballStemmer:
         if self.tokenizer is None:
             self.tokenizer = tokenization.RegexTokenizer()
 
-        self.stemmer = nltkstem.SnowballStemmer('russian')
+        self.stemmer = nltkstem.SnowballStemmer(language)
 
     def lemmatize(self, text):
         """Tokenizes and stems each word in the given text.
         Returns list of (word, lemma) pairs.
-
         :param text: str, Russian text to process
         """
         result = list()
@@ -155,11 +180,11 @@ class SnowballStemmer:
         return self.stemmer.stem(word)
 
 
-class Pymystem3Lemmatizer:
+class Pymystem3Lemmatizer(AbstractLemmatizer):
     """Wrapper around Pymystem3 implementation. It supports Russian, Polish
     and English lemmatization.
     Note that Mystem does its own tokenization.
-    The analyze function returns one best lemma preduction. Example:
+    The analyze function returns one best lemma prediction. Example:
     >>>self.mystem.analyze("это предложение")
     >>>[{'analysis': [{'lex': 'этот', 'wt': 0.05565618415, 'gr': 'APRO=(вин,ед,сред|им,ед,сред)'}], 'text': 'это'},
        {'text': ' '}, {'analysis': [{'lex': 'предложение', 'wt': 1, 'gr': 'S,сред,неод=(вин,ед|им,ед)'}], 'text': 'предложение'}]
@@ -221,7 +246,7 @@ class Pymystem3Lemmatizer:
         return result
 
 
-class Pymorphy2Lemmatizer:
+class Pymorphy2Lemmatizer(AbstractLemmatizer):
     """Wrapper around Pymorphy2Lemmatizer. Default tokenizer
     is RegexTokenizer with WORD_TYPE_NO_DIGITS_TOKENIZATION
 
@@ -259,7 +284,7 @@ class Pymorphy2Lemmatizer:
         return self.analyzer.parse(word)[0].normal_form
 
 
-class TruncationStemmer:
+class TruncationStemmer(AbstractLemmatizer):
     """A naive strategy to stem by keeping the first num_chars number of
     characters in a word
     """
@@ -292,10 +317,41 @@ class TruncationStemmer:
         return word[:self.num_chars]
 
 
+class SpaCyLemmatizer(AbstractLemmatizer):
+    """Load a spaCy model for lemmatization
+    """
+    def __init__(self, keep_punct=False, language_model='de_core_news_lg'):
+        """Instantiates spaCy model.
+        This will throw an error if you don't have the language model downloaded.
+        """
+        self.nlp = spacy.load(language_model)
+        self.keep_punct = keep_punct
+
+    def lemmatize(self, text):
+        """Returns a list of (word, lemma) pairs for each word in the given text. Spacy's sentence breaking and tokenization is used.
+
+        :param text: str, text to process
+        """
+        results = []
+        spacy_doc = self.nlp(text)
+        for token in spacy_doc:
+            if not token.is_punct or self.keep_punct:
+                results.append(NormalizedToken(token.text, token.lemma_))
+
+        return results
+
+    def single_term_lemma(self, word):
+        """Returns the lemma of a single word as a string. Beware this can return empty strings in some cases.
+
+        :param word: str, single word to get lemma for
+        """
+        return self.nlp(word)[0].lemma_
+
+
 def pick_lemmatizer(choice):
     """Returns a lemmatizer object with default settings corresponding to
     user input choice
-
+    .. TODO: currently only returns Russian stemmers
     :param choice: str, defined choice of lemmatizer to use
     """
     if choice==PYMORPHY:
@@ -310,6 +366,28 @@ def pick_lemmatizer(choice):
         return TruncationStemmer()
     else:
         raise ValueError(f"Stemmer choice '{choice}' is undefined")
+
+def get_language_specific_stemmers(language):
+    """Returns a dictionary of {"stemmer_name": instance of AbstractLemmatizer} containing
+    lemmatizers and stemmers appropriate for the given language.
+
+    :param language: str, language name or code
+    """
+    lang = language.lower()
+    if lang in ["russian", "ru"]:
+        stemmers = { PYMYSTEM: Pymystem3Lemmatizer(),
+                     STANZA: StanzaLemmatizer(language='ru'),
+                     SNOWBALL: SnowballStemmer(language='russian')
+                    }
+    elif lang in ["german", "de"]:
+        stemmers = { SNOWBALL :SnowballStemmer(language='german'),
+                     STANZA: StanzaLemmatizer(language='de'),
+                     SPACY: SpaCyLemmatizer()
+                    }
+    else:
+        raise ValueError(f"Not a valid language choice: {language}")
+
+    return stemmers
 
 
 def main(tsv_in, text_col, tsv_out, count_tsv, lemmatizer, author_col):
