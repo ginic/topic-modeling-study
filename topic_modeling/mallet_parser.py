@@ -60,15 +60,19 @@ def get_state_file_from_surface_forms(raw_state_file, treatment_state_file, outp
     alpha_text = treatment_reader.readline()
     gzip_writer.write(alpha_text)
     beta_text = treatment_reader.readline()
-    gzip_writer.write(alpha_text)
+    gzip_writer.write(beta_text)
 
     # The treament and raw state file should be the same length
-    for treatment_line in treatment_reader.readline():
+    count=0
+    for treatment_line in treatment_reader:
         # topic allocation comes from the treatment model, everything else from the raw
-        _, _, _, _, _, treatment_topic = split_mallet_state_file_row(treatment_line)
+        _, _, _, _, treatment_term, treatment_topic = split_mallet_state_file_row(treatment_line)
         doc_id, source, pos, term_idx, term, _ = split_mallet_state_file_row(raw_reader.readline())
-        output_result = " ".join([str(doc_id), source, pos, term_idx, term, treatment_topic])
+        output_result = " ".join([str(doc_id), source, pos, term_idx, term, str(treatment_topic)])
         gzip_writer.write(output_result + "\n")
+        if count % 10000==0:
+            print("Document:", doc_id, "Raw term:", term, "Treated term:", treatment_term)
+        count+=1
 
     treatment_reader.close()
     raw_reader.close()
@@ -450,7 +454,7 @@ slot_entropy_parser.add_argument('out_prefix', help="Prefix to add to output TSV
 unmap_stemming_parser = subparsers.add_parser('unmap-stemmed-state', help="Map back to original raw terms in order to compute coherence metrics using the same vocabulary")
 unmap_stemming_parser.add_argument('raw_gz', help="Gzip file for the Mallet state file to use terms/vocabulary from")
 unmap_stemming_parser.add_argument('treatment_gz', help="Gzip file for Mallet state file from which to use topic assignments for tokens")
-unmap_stemming_parser.add_argument('output_gz', help="Path to thenew gzip Mallet state file that will be created")
+unmap_stemming_parser.add_argument('output_gz', help="Path to the new gzip Mallet state file that will be created")
 
 
 
@@ -487,6 +491,10 @@ if __name__ == "__main__":
         print("Writing resulting dataframe to", entropy_file)
         full_metrics_df.to_csv(entropy_file, sep="\t", index=False)
     elif subparser_name=="unmap-stemmed-state":
+        print("Starting unstemming:")
+        print("Raw state file:", args.raw_gz)
+        print("Treatment state file:", args.treatment_gz)
+        print("Output state file:", args.output_gz)
         get_state_file_from_surface_forms(args.raw_gz, args.treatment_gz, args.output_gz)
 
     else:
